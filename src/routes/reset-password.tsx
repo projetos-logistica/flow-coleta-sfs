@@ -1,3 +1,4 @@
+import darkLogo from "@/assets/logo-azzas-dark.asset.json";
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,7 +62,7 @@ function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <img src="/logo-azzas-dark.png" alt="AZZAS 2154" className="mx-auto mb-4 h-8 w-auto" />
+        <img src={darkLogo.url} alt="AZZAS 2154" className="mx-auto mb-4 h-8 w-auto" />
         <h1 className="mb-1 text-center text-lg font-bold text-foreground">Redefinir senha</h1>
         <p className="mb-5 text-center text-xs text-muted-foreground">Defina uma nova senha para sua conta</p>
         {valido ? (

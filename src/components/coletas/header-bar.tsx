@@ -1,3 +1,5 @@
+import lightLogo from "@/assets/logo-azzas-white.asset.json";
+import darkLogo from "@/assets/logo-azzas-dark.asset.json";
 import { useEffect, useState } from "react";
 import { Download, FileSpreadsheet, FileText, Info, LogOut, Trash2, Upload } from "lucide-react";
 import {
@@ -61,12 +63,12 @@ export function HeaderBar({
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-3">
             <img
-              src="/logo-azzas-dark.png"
+              src={darkLogo.url}
               alt="AZZAS 2154"
               className="h-7 w-auto shrink-0 dark:hidden"
             />
             <img
-              src="/logo-azzas-white.png"
+              src={lightLogo.url}
               alt="AZZAS 2154"
               className="hidden h-7 w-auto shrink-0 dark:block"
             />

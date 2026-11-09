@@ -122,7 +122,7 @@ export function nivelSla(escala?: string | null): NivelSla {
   return "emdia";
 }
 
-export const FIELD_LABELS: Record<string, string> = {
+export const FIELD_LABELS = {
   data_pedido: "Data do Pedido",
   numero_pedido: "Número do Pedido",
   nome_loja: "Nome da Loja",
@@ -134,7 +134,7 @@ export const FIELD_LABELS: Record<string, string> = {
   status_coleta: "Status Coleta",
   situacao: "Situação",
   status_contato: "Status Contato",
-};
+} as const;
 
 export const DISPLAY_ORDER = [
   "data_pedido",

@@ -29,7 +29,10 @@ function lerArquivo(file: File): Promise<Record<string, unknown>[]> {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: "array", cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        const sheetName = wb.SheetNames[0];
+        if (!sheetName) throw new Error("Planilha vazia.");
+        const ws = wb.Sheets[sheetName];
+        if (!ws) throw new Error("Planilha vazia.");
         resolve(XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, unknown>[]);
       } catch {
         reject(new Error("Não consegui ler esse arquivo. Verifique se é um .xlsx, .xls ou .csv válido."));
@@ -48,7 +51,9 @@ export async function importarPlanilha(
   const rows = await lerArquivo(file);
   if (rows.length === 0) throw new Error("A planilha parece estar vazia.");
 
-  const headers = Object.keys(rows[0]);
+  const firstRow = rows[0];
+  if (!firstRow) throw new Error("Planilha vazia.");
+  const headers = Object.keys(firstRow);
   const col = {
     data: findHeader(headers, (n) => n.includes("data") && n.includes("pedido")),
     numero: findHeader(headers, (n) => n.includes("numero") && n.includes("pedido")),
