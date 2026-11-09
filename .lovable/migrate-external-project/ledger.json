@@ -3,15 +3,15 @@
     "capability": "code",
     "source": "ZIP",
     "outcome": "migrate",
-    "status": "in_progress",
-    "next_action": "Import source"
+    "status": "verified",
+    "next_action": "None"
   },
   {
     "capability": "schema",
     "source": "SQL migrations",
     "outcome": "migrate",
-    "status": "in_progress",
-    "next_action": "Apply schema"
+    "status": "verified",
+    "next_action": "None"
   },
   {
     "capability": "records",
@@ -31,8 +31,8 @@
     "capability": "authorization",
     "source": "Authenticated shared dashboard and corporate domains",
     "outcome": "preserve",
-    "status": "in_progress",
-    "next_action": "Verify Cloud policies"
+    "status": "verified",
+    "next_action": "Corporate operator tested; pending-order delete and role escalation denied"
   },
   {
     "capability": "uploaded file bytes",
@@ -52,15 +52,15 @@
     "capability": "public endpoints",
     "source": "Password reset RPC is unauthenticated",
     "outcome": "replace",
-    "status": "in_progress",
-    "next_action": "Replace unsafe direct reset with verified email recovery"
+    "status": "implemented",
+    "next_action": "Secure email recovery implemented; live email round-trip awaits user verification"
   },
   {
     "capability": "callbacks",
     "source": "/reset-password",
     "outcome": "preserve",
-    "status": "in_progress",
-    "next_action": "Verify recovery page"
+    "status": "partially_verified",
+    "next_action": "Invalid recovery link rejected; valid email recovery awaits user verification"
   },
   {
     "capability": "webhooks",
@@ -73,15 +73,15 @@
     "capability": "schedules",
     "source": "Client-triggered collection hygiene",
     "outcome": "preserve",
-    "status": "in_progress",
-    "next_action": "Keep existing behavior"
+    "status": "implemented",
+    "next_action": "Original client-triggered two-business-day cleanup and 48-hour transition preserved; unit tests passed, time-triggered live behavior not verified"
   },
   {
     "capability": "secrets",
     "source": "Cloud bindings",
     "outcome": "replace",
-    "status": "in_progress",
-    "next_action": "Use generated Cloud bindings"
+    "status": "verified",
+    "next_action": "None"
   },
   {
     "capability": "cutover",
@@ -94,7 +94,7 @@
     "capability": "verification",
     "source": "Preview",
     "outcome": "verify",
-    "status": "in_progress",
-    "next_action": "Test dashboard workflows"
+    "status": "partially_verified",
+    "next_action": "Passed desktop/phone login, CSV import, persisted update, XLSX/CSV exports, delta collection, cleanup; imported-user email recovery awaits export and user verification"
   }
 ]
