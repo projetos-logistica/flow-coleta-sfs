@@ -28,3 +28,9 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Imported application
+- Keep the collection dashboard at `src/routes/index.tsx`, with `/auth` and `/reset-password`; the root dashboard guard avoids competing index routes.
+- Use managed Cloud integrations and authenticated corporate-domain policies for collection data; archive credentials and generated integration files must not overwrite managed bindings.
+- Password recovery must verify email ownership through Cloud Auth; never migrate the source unauthenticated direct-password-reset endpoint.
+- Destructive base clearing uses database admin roles; client-side visibility never authorizes deletion.

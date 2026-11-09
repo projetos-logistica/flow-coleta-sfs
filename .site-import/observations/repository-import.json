@@ -1,0 +1,27 @@
+{
+  "source": "Repository ZIP; no running source site supplied",
+  "source_visual_comparison": "blocked: no source URL",
+  "preview_checks": [
+    "Desktop and phone login rendered",
+    "Unauthorized email rejected",
+    "Invalid reset link rejected",
+    "Password login using temporary verified corporate test account passed",
+    "UTF-8 CSV import passed",
+    "Status changed and read back after reload",
+    "Filtered XLSX export downloaded",
+    "Audit CSV export downloaded",
+    "Ranking collapse and reopen passed",
+    "Desktop and phone wheel-scrolled screenshots captured",
+    "Phone page had no horizontal overflow after wrapping date controls and user identity",
+    "Pending-order deletion denied for non-admin",
+    "Self admin-role insertion denied",
+    "Second import marked absent order collected",
+    "Temporary account, orders, and audit rows deleted"
+  ],
+  "remaining": [
+    "Existing records and users not supplied",
+    "Real-user email verification and recovery round-trip unverified",
+    "Source-to-preview visual comparison unavailable",
+    "Publishing and cutover pending"
+  ]
+}

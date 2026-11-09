@@ -1,0 +1,100 @@
+[
+  {
+    "capability": "code",
+    "source": "ZIP",
+    "outcome": "migrate",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "schema",
+    "source": "SQL migrations",
+    "outcome": "migrate",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "records",
+    "source": "No exports bundled",
+    "outcome": "migrate",
+    "status": "pending",
+    "next_action": "Upload table CSV or JSON exports"
+  },
+  {
+    "capability": "auth identities",
+    "source": "No user exports bundled",
+    "outcome": "migrate",
+    "status": "pending",
+    "next_action": "Upload user export with original IDs and emails"
+  },
+  {
+    "capability": "authorization",
+    "source": "Authenticated shared dashboard and corporate domains",
+    "outcome": "preserve",
+    "status": "verified",
+    "next_action": "Corporate operator tested; pending-order delete and role escalation denied"
+  },
+  {
+    "capability": "uploaded file bytes",
+    "source": "No stored files detected",
+    "outcome": "not_applicable",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "external providers",
+    "source": "No external service call sites detected",
+    "outcome": "not_applicable",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "public endpoints",
+    "source": "Password reset RPC is unauthenticated",
+    "outcome": "replace",
+    "status": "implemented",
+    "next_action": "Secure email recovery implemented; live email round-trip awaits user verification"
+  },
+  {
+    "capability": "callbacks",
+    "source": "/reset-password",
+    "outcome": "preserve",
+    "status": "partially_verified",
+    "next_action": "Invalid recovery link rejected; valid email recovery awaits user verification"
+  },
+  {
+    "capability": "webhooks",
+    "source": "None detected",
+    "outcome": "not_applicable",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "schedules",
+    "source": "Client-triggered collection hygiene",
+    "outcome": "preserve",
+    "status": "implemented",
+    "next_action": "Original client-triggered two-business-day cleanup and 48-hour transition preserved; unit tests passed, time-triggered live behavior not verified"
+  },
+  {
+    "capability": "secrets",
+    "source": "Cloud bindings",
+    "outcome": "replace",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "cutover",
+    "source": "No published URL supplied",
+    "outcome": "pending",
+    "status": "pending",
+    "next_action": "Publish and switch destination"
+  },
+  {
+    "capability": "verification",
+    "source": "Preview",
+    "outcome": "verify",
+    "status": "partially_verified",
+    "next_action": "Passed desktop/phone login, CSV import, persisted update, XLSX/CSV exports, delta collection, cleanup; imported-user email recovery awaits export and user verification"
+  }
+]
