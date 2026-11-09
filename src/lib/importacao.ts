@@ -28,7 +28,7 @@ function lerArquivo(file: File): Promise<Record<string, unknown>[]> {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array", cellDates: true });
+        const wb = XLSX.read(data, { type: "array", cellDates: true, codepage: 65001 });
         const sheetName = wb.SheetNames[0];
         if (!sheetName) throw new Error("Planilha vazia.");
         const ws = wb.Sheets[sheetName];
