@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794250025077,
+      "tag": "0000_import_collection_dashboard",
+      "breakpoints": true
+    }
+  ]
 }

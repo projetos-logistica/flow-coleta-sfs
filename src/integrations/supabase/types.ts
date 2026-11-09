@@ -14,16 +14,150 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      historico_alteracoes: {
+        Row: {
+          campo: string
+          created_at: string
+          id: string
+          numero_pedido: string
+          usuario: string
+          valor_anterior: string
+          valor_novo: string
+        }
+        Insert: {
+          campo: string
+          created_at?: string
+          id?: string
+          numero_pedido: string
+          usuario?: string
+          valor_anterior?: string
+          valor_novo?: string
+        }
+        Update: {
+          campo?: string
+          created_at?: string
+          id?: string
+          numero_pedido?: string
+          usuario?: string
+          valor_anterior?: string
+          valor_novo?: string
+        }
+        Relationships: []
+      }
+      pedidos: {
+        Row: {
+          coletado_at: string | null
+          created_at: string
+          data_alteracao_situacao: string | null
+          data_coleta: string | null
+          data_pedido: string
+          editado_por: string
+          escala_coleta: string
+          importado_at: string | null
+          importado_por: string
+          marca: string
+          nome_loja: string
+          numero_pedido: string
+          origem: string
+          situacao: string
+          situacao_updated_at: string | null
+          status_coleta: string
+          status_contato: string
+          transportadora: string
+          uf_destino: string
+          updated_at: string
+        }
+        Insert: {
+          coletado_at?: string | null
+          created_at?: string
+          data_alteracao_situacao?: string | null
+          data_coleta?: string | null
+          data_pedido?: string
+          editado_por?: string
+          escala_coleta?: string
+          importado_at?: string | null
+          importado_por?: string
+          marca?: string
+          nome_loja?: string
+          numero_pedido: string
+          origem?: string
+          situacao?: string
+          situacao_updated_at?: string | null
+          status_coleta?: string
+          status_contato?: string
+          transportadora?: string
+          uf_destino?: string
+          updated_at?: string
+        }
+        Update: {
+          coletado_at?: string | null
+          created_at?: string
+          data_alteracao_situacao?: string | null
+          data_coleta?: string | null
+          data_pedido?: string
+          editado_por?: string
+          escala_coleta?: string
+          importado_at?: string | null
+          importado_por?: string
+          marca?: string
+          nome_loja?: string
+          numero_pedido?: string
+          origem?: string
+          situacao?: string
+          situacao_updated_at?: string | null
+          status_coleta?: string
+          status_contato?: string
+          transportadora?: string
+          uf_destino?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      email_existe: { Args: { _email: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      importar_pedidos_bulk: { Args: { p_pedidos: Json }; Returns: number }
+      is_collection_operator: { Args: never; Returns: boolean }
+      marcar_coletados_bulk: {
+        Args: { p_coletado_at: string; p_numeros: string[] }
+        Returns: number
+      }
+      marcar_coletados_por_timestamp: {
+        Args: { p_antes_de: string; p_coletado_at: string }
+        Returns: number
+      }
+      registrar_historico_bulk: { Args: { p_eventos: Json }; Returns: number }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +284,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
