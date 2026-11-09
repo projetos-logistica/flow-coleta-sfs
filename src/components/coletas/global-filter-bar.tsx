@@ -83,7 +83,7 @@ export function GlobalFilterBar({
     <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
       <div className="flex flex-wrap items-center gap-3">
         {/* 1. Período */}
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs text-slate-700">
+        <div className="flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs text-slate-700">
           <Calendar className="size-3.5 text-slate-400" />
           <span className="font-semibold text-slate-500">Período:</span>
           <input

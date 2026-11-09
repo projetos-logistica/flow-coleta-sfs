@@ -88,7 +88,7 @@ export function HeaderBar({
 
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span>Operando como:</span>
-            <span className="font-semibold text-slate-700">{usuario}</span>
+            <span className="min-w-0 break-all font-semibold text-slate-700">{usuario}</span>
           </div>
         </div>
 
