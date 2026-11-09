@@ -1,0 +1,100 @@
+[
+  {
+    "capability": "code",
+    "source": "ZIP",
+    "outcome": "migrate",
+    "status": "in_progress",
+    "next_action": "Import source"
+  },
+  {
+    "capability": "schema",
+    "source": "SQL migrations",
+    "outcome": "migrate",
+    "status": "in_progress",
+    "next_action": "Apply schema"
+  },
+  {
+    "capability": "records",
+    "source": "No exports bundled",
+    "outcome": "migrate",
+    "status": "pending",
+    "next_action": "Upload table CSV or JSON exports"
+  },
+  {
+    "capability": "auth identities",
+    "source": "No user exports bundled",
+    "outcome": "migrate",
+    "status": "pending",
+    "next_action": "Upload user export with original IDs and emails"
+  },
+  {
+    "capability": "authorization",
+    "source": "Authenticated shared dashboard and corporate domains",
+    "outcome": "preserve",
+    "status": "in_progress",
+    "next_action": "Verify Cloud policies"
+  },
+  {
+    "capability": "uploaded file bytes",
+    "source": "No stored files detected",
+    "outcome": "not_applicable",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "external providers",
+    "source": "No external service call sites detected",
+    "outcome": "not_applicable",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "public endpoints",
+    "source": "Password reset RPC is unauthenticated",
+    "outcome": "replace",
+    "status": "in_progress",
+    "next_action": "Replace unsafe direct reset with verified email recovery"
+  },
+  {
+    "capability": "callbacks",
+    "source": "/reset-password",
+    "outcome": "preserve",
+    "status": "in_progress",
+    "next_action": "Verify recovery page"
+  },
+  {
+    "capability": "webhooks",
+    "source": "None detected",
+    "outcome": "not_applicable",
+    "status": "verified",
+    "next_action": "None"
+  },
+  {
+    "capability": "schedules",
+    "source": "Client-triggered collection hygiene",
+    "outcome": "preserve",
+    "status": "in_progress",
+    "next_action": "Keep existing behavior"
+  },
+  {
+    "capability": "secrets",
+    "source": "Cloud bindings",
+    "outcome": "replace",
+    "status": "in_progress",
+    "next_action": "Use generated Cloud bindings"
+  },
+  {
+    "capability": "cutover",
+    "source": "No published URL supplied",
+    "outcome": "pending",
+    "status": "pending",
+    "next_action": "Publish and switch destination"
+  },
+  {
+    "capability": "verification",
+    "source": "Preview",
+    "outcome": "verify",
+    "status": "in_progress",
+    "next_action": "Test dashboard workflows"
+  }
+]
