@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 interface UsuariosAprovacoesViewProps {
   usuarioIdent: string;
   onVoltarPainel: () => void;
+  onNavigate?: (tela: "painel" | "aging" | "usuarios") => void;
 }
 
 export function UsuariosAprovacoesView({
   usuarioIdent,
   onVoltarPainel,
+  onNavigate,
 }: UsuariosAprovacoesViewProps) {
   const {
     users,
@@ -44,6 +46,7 @@ export function UsuariosAprovacoesView({
         telaAtual="usuarios"
         onSelectTela={(tela) => {
           if (tela === "painel") onVoltarPainel();
+          else if (onNavigate) onNavigate(tela);
         }}
         className="hidden md:flex shrink-0 border-r border-slate-800/20"
       />

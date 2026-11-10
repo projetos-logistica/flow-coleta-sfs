@@ -1,7 +1,7 @@
 import lightLogo from "@/assets/logo-azzas-white.asset.json";
 import darkLogo from "@/assets/logo-azzas-dark.asset.json";
 import { useEffect, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Info, LogOut, ShieldCheck, Trash2, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, LogOut, PanelLeft, Trash2, Upload } from "lucide-react";
 import { isUserAdmin } from "@/lib/rbac";
 import {
   DropdownMenu,
@@ -109,15 +109,15 @@ export function HeaderBar({
 
         {/* Direita: Ações Consolidadas */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botão de Atalho: Administração / Acessos */}
+          {/* Botão de Atalho: Menu Lateral */}
           <button
             type="button"
             onClick={onOpenAdmin}
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98] cursor-pointer"
-            title="Abrir menu lateral de administração e gestão de acessos"
+            title="Abrir menu lateral de navegação"
           >
-            <ShieldCheck className="size-4 text-indigo-600" />
-            <span>Administração</span>
+            <PanelLeft className="size-4 text-indigo-600" />
+            <span>Menu Lateral</span>
           </button>
 
           {/* Botão Primário: Importar Planilha */}

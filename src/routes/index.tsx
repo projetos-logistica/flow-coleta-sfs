@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/sheet";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
+import { AgingBacklogView } from "@/components/aging/aging-backlog-view";
 
 export const Route = createFileRoute("/")(
   {
@@ -83,8 +84,8 @@ export const Route = createFileRoute("/")(
 
 
 function Painel() {
-  // ─── Navegação Administrativa (RBAC) ───
-  const [telaAtual, setTelaAtual] = useState<"painel" | "usuarios">("painel");
+  // ─── Navegação Administrativa / Módulos ───
+  const [telaAtual, setTelaAtual] = useState<"painel" | "aging" | "usuarios">("painel");
   const [sheetAdminAberta, setSheetAdminAberta] = useState(false);
 
   // ─── Estado de Usuário ───
@@ -633,6 +634,23 @@ function Painel() {
         <UsuariosAprovacoesView
           usuarioIdent={usuario}
           onVoltarPainel={() => setTelaAtual("painel")}
+          onNavigate={(tela) => setTelaAtual(tela)}
+        />
+      </>
+    );
+  }
+
+  // ─── Render Condicional: Módulo de Aging de Backlog ───
+  if (telaAtual === "aging") {
+    return (
+      <>
+        <Toaster />
+        <AgingBacklogView
+          pedidos={pedidos}
+          usuario={usuario}
+          onVoltarPainel={() => setTelaAtual("painel")}
+          onNavigate={(tela) => setTelaAtual(tela)}
+          onChangeField={alterarCampo}
         />
       </>
     );
@@ -648,7 +666,7 @@ function Painel() {
         <SheetContent side="left" className="p-0 w-64 border-r border-slate-800/40 bg-[#0b1727] text-white">
           <SheetTitle className="sr-only">Navegação Administrativa</SheetTitle>
           <SheetDescription className="sr-only">
-            Menu lateral para alternar entre o Painel Operacional e a Gestão de Usuários e Aprovações.
+            Menu lateral para alternar entre o Painel Operacional, Aging de Backlog e Usuários e Aprovações.
           </SheetDescription>
           <AdminSidebar
             telaAtual={telaAtual}

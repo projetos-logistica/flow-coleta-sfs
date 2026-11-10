@@ -1,10 +1,10 @@
 import lightLogo from "@/assets/logo-azzas-white.asset.json";
-import { LayoutDashboard, Users, History, ChevronLeft } from "lucide-react";
+import { LayoutDashboard, Clock, Users, History, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AdminSidebarProps {
-  telaAtual: "painel" | "usuarios";
-  onSelectTela: (tela: "painel" | "usuarios") => void;
+  telaAtual: "painel" | "aging" | "usuarios";
+  onSelectTela: (tela: "painel" | "aging" | "usuarios") => void;
   onClose?: () => void;
   className?: string;
 }
@@ -55,7 +55,7 @@ export function AdminSidebar({
                 onClose?.();
               }}
               className={cn(
-                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition",
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition cursor-pointer",
                 telaAtual === "painel"
                   ? "bg-blue-600/30 text-white font-semibold shadow-xs"
                   : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
@@ -63,6 +63,23 @@ export function AdminSidebar({
             >
               <LayoutDashboard className="size-4 shrink-0 text-slate-400" />
               <span>Painel operacional</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onSelectTela("aging");
+                onClose?.();
+              }}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition cursor-pointer",
+                telaAtual === "aging"
+                  ? "bg-blue-600/30 text-white font-semibold shadow-xs"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+              )}
+            >
+              <Clock className="size-4 shrink-0 text-amber-400" />
+              <span>Aging de Backlog</span>
             </button>
           </nav>
         </div>
