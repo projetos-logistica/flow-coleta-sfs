@@ -1,7 +1,8 @@
 import lightLogo from "@/assets/logo-azzas-white.asset.json";
 import darkLogo from "@/assets/logo-azzas-dark.asset.json";
 import { useEffect, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Info, LogOut, Trash2, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, LogOut, ShieldCheck, Trash2, Upload } from "lucide-react";
+import { isUserAdmin } from "@/lib/rbac";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,7 @@ type HeaderBarProps = {
   onExportarBase: () => void;
   onExportarHistorico: () => void;
   onLimparBase: () => void;
+  onOpenAdmin: () => void;
   importando?: boolean;
 };
 
@@ -38,23 +40,36 @@ export function HeaderBar({
   onExportarBase,
   onExportarHistorico,
   onLimparBase,
+  onOpenAdmin,
   importando = false,
 }: HeaderBarProps) {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => isUserAdmin(usuario));
 
   useEffect(() => {
     let ativo = true;
-    supabase.auth
-      .getUser()
-      .then(({ data }) => {
-        if (!data.user) return;
-        void supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" }).then(({ data: allowed }) => { if (ativo) setIsAdmin(Boolean(allowed)); });
-      })
-      .catch(() => undefined);
+
+    // Atualiza estado com base no RBAC local e na sessão
+    function sincronizarAdmin() {
+      supabase.auth
+        .getUser()
+        .then(({ data }) => {
+          if (!ativo) return;
+          const email = data.user?.email || "";
+          setIsAdmin(isUserAdmin(email) || isUserAdmin(usuario));
+        })
+        .catch(() => {
+          if (ativo) setIsAdmin(isUserAdmin(usuario));
+        });
+    }
+
+    sincronizarAdmin();
+
+    window.addEventListener("rbac-users-updated", sincronizarAdmin);
     return () => {
       ativo = false;
+      window.removeEventListener("rbac-users-updated", sincronizarAdmin);
     };
-  }, []);
+  }, [usuario]);
 
   return (
     <header className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all">
@@ -94,6 +109,17 @@ export function HeaderBar({
 
         {/* Direita: Ações Consolidadas */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Botão de Atalho: Administração / Acessos */}
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98] cursor-pointer"
+            title="Abrir menu lateral de administração e gestão de acessos"
+          >
+            <ShieldCheck className="size-4 text-indigo-600" />
+            <span>Administração</span>
+          </button>
+
           {/* Botão Primário: Importar Planilha */}
           <button
             type="button"

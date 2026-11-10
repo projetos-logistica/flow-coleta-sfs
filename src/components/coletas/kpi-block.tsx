@@ -58,7 +58,7 @@ export function KpiBlock({
                           : card.theme === "noprazo"
                             ? "border-emerald-500 bg-emerald-50/40 ring-2 ring-emerald-500/20 shadow-xs"
                             : card.theme === "coletados"
-                              ? "border-slate-900 bg-slate-50 ring-2 ring-slate-900/20 shadow-xs"
+                              ? "border-purple-500 bg-purple-50/40 ring-2 ring-purple-500/20 shadow-xs"
                               : "border-indigo-600 bg-indigo-50/40 ring-2 ring-indigo-600/20 shadow-xs"
                         : "border-slate-200/80 bg-white hover:border-slate-300"
                     )}
@@ -70,7 +70,7 @@ export function KpiBlock({
                         card.theme === "neutro" && "bg-indigo-500",
                         card.theme === "atrasado" && "bg-rose-500",
                         card.theme === "noprazo" && "bg-emerald-500",
-                        card.theme === "coletados" && "bg-black"
+                        card.theme === "coletados" && "bg-purple-600"
                       )}
                     />
                     <div className="flex items-center justify-between">
@@ -86,7 +86,7 @@ export function KpiBlock({
                               : card.theme === "noprazo"
                                 ? "bg-emerald-100 text-emerald-700"
                                 : card.theme === "coletados"
-                                  ? "bg-slate-900 text-white"
+                                  ? "bg-purple-100 text-purple-700"
                                   : "bg-indigo-100 text-indigo-700"
                           )}
                         >
@@ -102,7 +102,7 @@ export function KpiBlock({
                           : card.theme === "noprazo"
                             ? "text-emerald-600"
                             : card.theme === "coletados"
-                              ? "text-black"
+                              ? "text-purple-700"
                               : "text-slate-900"
                       )}
                     >

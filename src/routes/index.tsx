@@ -42,6 +42,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PanelLeftOpen, Copy, AlertTriangle } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
 
 export const Route = createFileRoute("/")(
   {
@@ -75,6 +83,10 @@ export const Route = createFileRoute("/")(
 
 
 function Painel() {
+  // ─── Navegação Administrativa (RBAC) ───
+  const [telaAtual, setTelaAtual] = useState<"painel" | "usuarios">("painel");
+  const [sheetAdminAberta, setSheetAdminAberta] = useState(false);
+
   // ─── Estado de Usuário ───
   const [usuario, setUsuario] = useState("");
 
@@ -613,10 +625,41 @@ function Painel() {
 
   const totalSelecionados = filtrados.filter((p) => selecionados.has(p.numero_pedido)).length;
 
-  // ─── Render ───
+  // ─── Render Condicional: Módulo de Usuários e Aprovações ───
+  if (telaAtual === "usuarios") {
+    return (
+      <>
+        <Toaster />
+        <UsuariosAprovacoesView
+          usuarioIdent={usuario}
+          onVoltarPainel={() => setTelaAtual("painel")}
+        />
+      </>
+    );
+  }
+
+  // ─── Render: Painel Operacional ───
   return (
     <main className="min-h-screen w-full bg-dashboard px-4 pb-16 pt-7 sm:px-6" >
       <Toaster />
+
+      {/* Menu Lateral Retrátil (Sidebar / Sheet) */}
+      <Sheet open={sheetAdminAberta} onOpenChange={setSheetAdminAberta}>
+        <SheetContent side="left" className="p-0 w-64 border-r border-slate-800/40 bg-[#0b1727] text-white">
+          <SheetTitle className="sr-only">Navegação Administrativa</SheetTitle>
+          <SheetDescription className="sr-only">
+            Menu lateral para alternar entre o Painel Operacional e a Gestão de Usuários e Aprovações.
+          </SheetDescription>
+          <AdminSidebar
+            telaAtual={telaAtual}
+            onSelectTela={(tela) => {
+              setTelaAtual(tela);
+              setSheetAdminAberta(false);
+            }}
+            onClose={() => setSheetAdminAberta(false)}
+          />
+        </SheetContent>
+      </Sheet>
 
       {/* Input de arquivo oculto */}
       <input
@@ -673,6 +716,7 @@ function Painel() {
         onExportarBase={exportarBase}
         onExportarHistorico={exportarHistorico}
         onLimparBase={onLimparBase}
+        onOpenAdmin={() => setSheetAdminAberta(true)}
         importando={importando}
       />
 
