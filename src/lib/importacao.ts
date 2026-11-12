@@ -63,6 +63,7 @@ export async function importarPlanilha(
     marca: findHeader(headers, (n) => n.includes("marca")),
     uf: findHeader(headers, (n) => n.includes("uf")),
     escala: findHeader(headers, (n) => n.includes("escala")),
+    romaneio: findHeader(headers, (n) => n.includes("romaneio")),
   };
 
   if (!col.numero) {
@@ -101,6 +102,9 @@ export async function importarPlanilha(
       escala_coleta: col.escala
         ? String(row[col.escala] ?? "").trim()
         : (existente?.escala_coleta ?? ""),
+      romaneio: col.romaneio
+        ? String(row[col.romaneio] ?? "").trim()
+        : (existente?.romaneio ?? ""),
       status_coleta: "Pendente",
       // Preservados na importação; sempre enviados para evitar nulos no upsert em lote.
       status_contato: existente?.status_contato ?? "",

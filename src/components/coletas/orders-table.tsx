@@ -23,6 +23,7 @@ import { useRef, useState } from "react";
 const HEADERS = [
   "Data do Pedido",
   "Número do Pedido",
+  "Romaneio",
   "Nome da Loja",
   "Transportadora",
   "Origem",
@@ -39,6 +40,7 @@ const HEADERS = [
 ];
 
 const HEADER_TOOLTIPS: Record<string, string> = {
+  Romaneio: "Número de identificação do romaneio de carga.",
   "Data Importação":
     "Data e hora da última planilha em que este pedido esteve presente.",
   "Data Coleta":
@@ -345,6 +347,9 @@ export function OrdersTable({
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-700">{p.data_pedido}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11.5px] font-semibold text-slate-800">
                     {p.numero_pedido}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11.5px] text-slate-700">
+                    {ouTraco(p.romaneio)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-900">{p.nome_loja}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{p.transportadora}</td>

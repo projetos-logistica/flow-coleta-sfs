@@ -17,6 +17,8 @@ import {
   FilterX,
   Layers,
   MapPin,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Store,
   Tag,
@@ -40,6 +42,7 @@ import {
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { useFilters } from "@/contexts/filters-context";
 
 export type AgingFaixaKey =
   | "no_prazo"
@@ -158,12 +161,19 @@ export function AgingBacklogView({
   onNavigate,
   onChangeField,
 }: AgingBacklogViewProps) {
-  // ─── Filtros Rápidos ───
-  const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
-  const [filtroOrigem, setFiltroOrigem] = useState<string[]>([]);
-  const [filtroTransportadora, setFiltroTransportadora] = useState<string[]>([]);
-  const [buscaTags, setBuscaTags] = useState<string[]>([]);
-  const [buscaTexto, setBuscaTexto] = useState("");
+  // ─── Filtros Compartilhados (via Contexto) ───
+  const {
+    filtroMarca,
+    setFiltroMarca,
+    filtroOrigem,
+    setFiltroOrigem,
+    filtroTransportadora,
+    setFiltroTransportadora,
+    buscaTags,
+    setBuscaTags,
+    buscaTexto,
+    setBuscaTexto,
+  } = useFilters();
   const [isFocused, setIsFocused] = useState(false);
 
   // ─── Seleção Interativa de Loja e Faixa (Drill-down) ───
@@ -179,6 +189,9 @@ export function AgingBacklogView({
     "smart" | "total" | "nome" | AgingFaixaKey
   >("smart");
   const [ordemDesc, setOrdemDesc] = useState(true);
+
+  // ─── Layout: Matriz Aging retrátil ───
+  const [matrizAberta, setMatrizAberta] = useState(true);
 
   // Refs de busca
   const containerRef = useRef<HTMLDivElement>(null);
@@ -230,7 +243,7 @@ export function AgingBacklogView({
         return false;
 
       if (todosTermos.length > 0) {
-        const conteudo = `${p.numero_pedido} ${p.nome_loja} ${p.transportadora} ${p.marca} ${p.origem} ${p.situacao}`.toLowerCase();
+        const conteudo = `${p.numero_pedido} ${p.nome_loja} ${p.transportadora} ${p.marca} ${p.origem} ${p.situacao} ${p.romaneio ?? ""}`.toLowerCase();
         const bateu = todosTermos.some((termo) => conteudo.includes(termo));
         if (!bateu) return false;
       }
@@ -488,6 +501,7 @@ export function AgingBacklogView({
     const linhas = pedidosDrillDown.map((p) => ({
       "Data do Pedido": p.data_pedido,
       "Número do Pedido": p.numero_pedido,
+      "Romaneio": p.romaneio ?? "",
       "Nome da Loja": p.nome_loja,
       "Transportadora": p.transportadora,
       "Origem": p.origem,
@@ -564,7 +578,7 @@ export function AgingBacklogView({
         </header>
 
         {/* Conteúdo com Scroll */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-4">
           {/* 1. BARRA DE BUSCA EM MASSA E FILTROS RÁPIDOS */}
           <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs space-y-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -828,532 +842,523 @@ export function AgingBacklogView({
             </div>
           </div>
 
-          {/* 2. MATRIZ DE ENVELHECIMENTO POR LOJA (PAINEL SUPERIOR) */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-900 px-6 py-4 text-white">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Store className="size-4 text-amber-400" />
-                  <h2 className="text-base font-bold">Matriz de Envelhecimento por Loja</h2>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-300">
-                    {matrizLojas.length} lojas
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Clique na loja para filtrar todos os pedidos, ou diretamente em uma célula de faixa para isolar uma urgência específica.
-                </p>
-              </div>
+          {/* 2. LAYOUT SIDE-BY-SIDE: Matriz Aging (esq) + Lista Detalhada (dir) */}
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
 
-              {/* Botão de Ordenação Inteligente */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-400">Ordenação:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOrdenarPor("smart");
-                    setOrdemDesc(true);
-                  }}
-                  className={cn(
-                    "rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer",
-                    ordenarPor === "smart"
-                      ? "bg-amber-400 text-slate-950 font-bold"
-                      : "bg-white/10 text-slate-300 hover:bg-white/20",
-                  )}
-                >
-                  ⚡ Maior Criticidade (Smart)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOrdenarPor("total");
-                    setOrdemDesc(!ordemDesc);
-                  }}
-                  className={cn(
-                    "rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer",
-                    ordenarPor === "total"
-                      ? "bg-amber-400 text-slate-950 font-bold"
-                      : "bg-white/10 text-slate-300 hover:bg-white/20",
-                  )}
-                >
-                  📦 Total Volume
-                </button>
-              </div>
-            </div>
-
-            {/* Tabela Matriz */}
-            <div className="max-h-[420px] overflow-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-2xs">
-                  <tr>
-                    <th className="py-3 px-4 font-bold bg-slate-100 min-w-[220px]">
-                      Loja
-                    </th>
-                    <th className="py-3 px-3 font-bold text-center bg-slate-200/60 min-w-[90px]">
-                      Total Pendente
-                    </th>
-                    <th className={cn("py-3 px-3 font-bold text-center min-w-[95px]", FAIXA_CONFIG.no_prazo.bgHeader, FAIXA_CONFIG.no_prazo.textHeader)}>
-                      No Prazo
-                    </th>
-                    <th className={cn("py-3 px-3 font-bold text-center min-w-[95px]", FAIXA_CONFIG["1_2_dias"].bgHeader, FAIXA_CONFIG["1_2_dias"].textHeader)}>
-                      1 a 2 dias
-                    </th>
-                    <th className={cn("py-3 px-3 font-bold text-center min-w-[95px]", FAIXA_CONFIG["3_4_dias"].bgHeader, FAIXA_CONFIG["3_4_dias"].textHeader)}>
-                      3 a 4 dias
-                    </th>
-                    <th className={cn("py-3 px-3 font-bold text-center min-w-[95px]", FAIXA_CONFIG["5_6_dias"].bgHeader, FAIXA_CONFIG["5_6_dias"].textHeader)}>
-                      5 a 6 dias
-                    </th>
-                    <th className={cn("py-3 px-3 font-bold text-center min-w-[95px]", FAIXA_CONFIG["7_10_dias"].bgHeader, FAIXA_CONFIG["7_10_dias"].textHeader)}>
-                      7 a 10 dias
-                    </th>
-                    <th className={cn("py-3 px-3 font-bold text-center min-w-[110px]", FAIXA_CONFIG["11_mais"].bgHeader, FAIXA_CONFIG["11_mais"].textHeader)}>
-                      11 dias ou mais
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {/* Linha de Totais Gerais (Resumo Superior) */}
-                  <tr className="bg-slate-50 font-bold border-b-2 border-slate-200 text-slate-900 sticky top-10 z-10">
-                    <td className="py-2.5 px-4 uppercase text-[11px] tracking-wider text-slate-700 bg-slate-100">
-                      ⚡ TOTAL GERAL CONSOLIDADO
-                    </td>
-                    <td className="py-2.5 px-3 text-center tabular-nums text-sm bg-slate-200/80">
-                      {totaisGerais.total.toLocaleString("pt-BR")}
-                    </td>
-                    <td
-                      onClick={() => handleSelectFaixaGlobal("no_prazo")}
-                      className={cn(
-                        "py-2.5 px-3 text-center tabular-nums cursor-pointer transition hover:bg-emerald-100",
-                        selectedFaixa === "no_prazo" && selectedLoja === null
-                          ? FAIXA_CONFIG.no_prazo.cellActive
-                          : "",
-                      )}
-                      title="Clique para filtrar todos 'No Prazo'"
-                    >
-                      <span className="inline-block rounded-md px-2 py-0.5 text-xs text-emerald-800 bg-emerald-100/70">
-                        {totaisGerais.no_prazo.toLocaleString("pt-BR")}
+            {/* COLUNA ESQUERDA: Matriz Aging (~35%) — retrátil */}
+            {matrizAberta && (
+              <div className="lg:col-span-4 xl:col-span-4 min-w-0">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  {/* Header Matriz Aging */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-900 px-4 py-3 text-white">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Store className="size-4 text-amber-400 shrink-0" />
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-bold leading-tight">Matriz Aging</h2>
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                          Clique na loja ou faixa para filtrar
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-300 shrink-0">
+                        {matrizLojas.length} lojas
                       </span>
-                    </td>
-                    <td
-                      onClick={() => handleSelectFaixaGlobal("1_2_dias")}
-                      className={cn(
-                        "py-2.5 px-3 text-center tabular-nums cursor-pointer transition hover:bg-amber-100",
-                        selectedFaixa === "1_2_dias" && selectedLoja === null
-                          ? FAIXA_CONFIG["1_2_dias"].cellActive
-                          : "",
-                      )}
-                      title="Clique para filtrar todos '1 a 2 dias'"
-                    >
-                      <span className="inline-block rounded-md px-2 py-0.5 text-xs text-amber-800 bg-amber-100/70">
-                        {totaisGerais.dias_1_2.toLocaleString("pt-BR")}
-                      </span>
-                    </td>
-                    <td
-                      onClick={() => handleSelectFaixaGlobal("3_4_dias")}
-                      className={cn(
-                        "py-2.5 px-3 text-center tabular-nums cursor-pointer transition hover:bg-orange-100",
-                        selectedFaixa === "3_4_dias" && selectedLoja === null
-                          ? FAIXA_CONFIG["3_4_dias"].cellActive
-                          : "",
-                      )}
-                      title="Clique para filtrar todos '3 a 4 dias'"
-                    >
-                      <span className="inline-block rounded-md px-2 py-0.5 text-xs text-orange-800 bg-orange-100/70">
-                        {totaisGerais.dias_3_4.toLocaleString("pt-BR")}
-                      </span>
-                    </td>
-                    <td
-                      onClick={() => handleSelectFaixaGlobal("5_6_dias")}
-                      className={cn(
-                        "py-2.5 px-3 text-center tabular-nums cursor-pointer transition hover:bg-orange-200",
-                        selectedFaixa === "5_6_dias" && selectedLoja === null
-                          ? FAIXA_CONFIG["5_6_dias"].cellActive
-                          : "",
-                      )}
-                      title="Clique para filtrar todos '5 a 6 dias'"
-                    >
-                      <span className="inline-block rounded-md px-2 py-0.5 text-xs text-orange-950 font-bold bg-orange-200/70">
-                        {totaisGerais.dias_5_6.toLocaleString("pt-BR")}
-                      </span>
-                    </td>
-                    <td
-                      onClick={() => handleSelectFaixaGlobal("7_10_dias")}
-                      className={cn(
-                        "py-2.5 px-3 text-center tabular-nums cursor-pointer transition hover:bg-rose-100",
-                        selectedFaixa === "7_10_dias" && selectedLoja === null
-                          ? FAIXA_CONFIG["7_10_dias"].cellActive
-                          : "",
-                      )}
-                      title="Clique para filtrar todos '7 a 10 dias'"
-                    >
-                      <span className="inline-block rounded-md px-2 py-0.5 text-xs text-rose-800 font-bold bg-rose-100/80">
-                        {totaisGerais.dias_7_10.toLocaleString("pt-BR")}
-                      </span>
-                    </td>
-                    <td
-                      onClick={() => handleSelectFaixaGlobal("11_mais")}
-                      className={cn(
-                        "py-2.5 px-3 text-center tabular-nums cursor-pointer transition hover:bg-purple-200",
-                        selectedFaixa === "11_mais" && selectedLoja === null
-                          ? FAIXA_CONFIG["11_mais"].cellActive
-                          : "",
-                      )}
-                      title="Clique para filtrar todos '11 dias ou mais'"
-                    >
-                      <span className="inline-block rounded-md px-2 py-0.5 text-xs text-purple-950 font-extrabold bg-purple-200/90">
-                        {totaisGerais.dias_11_mais.toLocaleString("pt-BR")}
-                      </span>
-                    </td>
-                  </tr>
-
-                  {/* Linhas de Cada Loja */}
-                  {matrizLojas.map((row) => {
-                    const isLojaSelected = selectedLoja === row.nome_loja;
-
-                    return (
-                      <tr
-                        key={row.nome_loja}
-                        className={cn(
-                          "transition-colors hover:bg-slate-50",
-                          isLojaSelected && "bg-indigo-50/40",
-                        )}
-                      >
-                        {/* Nome da Loja (Clicável para filtrar a loja inteira) */}
-                        <td
-                          onClick={() => handleSelectLoja(row.nome_loja)}
-                          className="py-2.5 px-4 font-semibold text-slate-800 cursor-pointer hover:text-indigo-600 transition"
-                          title="Clique para filtrar apenas esta loja"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate">{row.nome_loja}</span>
-                            {isLojaSelected && selectedFaixa === null && (
-                              <span className="rounded-full bg-indigo-600 px-1.5 py-0.2 text-[9px] font-bold text-white">
-                                Selecionada
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Total Pendente */}
-                        <td
-                          onClick={() => handleSelectLoja(row.nome_loja)}
-                          className="py-2.5 px-3 text-center tabular-nums font-bold text-slate-900 cursor-pointer hover:bg-slate-100"
-                        >
-                          {row.total.toLocaleString("pt-BR")}
-                        </td>
-
-                        {/* Célula: No Prazo */}
-                        <td
-                          onClick={() => handleSelectCelula(row.nome_loja, "no_prazo", row.no_prazo)}
-                          className={cn(
-                            "py-2.5 px-3 text-center tabular-nums cursor-pointer transition",
-                            row.no_prazo > 0 ? "hover:bg-emerald-50" : "text-slate-300",
-                            isLojaSelected && selectedFaixa === "no_prazo" && FAIXA_CONFIG.no_prazo.cellActive,
-                          )}
-                        >
-                          {row.no_prazo > 0 ? (
-                            <span className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100">
-                              {row.no_prazo.toLocaleString("pt-BR")}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-
-                        {/* Célula: 1 a 2 dias */}
-                        <td
-                          onClick={() => handleSelectCelula(row.nome_loja, "1_2_dias", row.dias_1_2)}
-                          className={cn(
-                            "py-2.5 px-3 text-center tabular-nums cursor-pointer transition",
-                            row.dias_1_2 > 0 ? "hover:bg-amber-50" : "text-slate-300",
-                            isLojaSelected && selectedFaixa === "1_2_dias" && FAIXA_CONFIG["1_2_dias"].cellActive,
-                          )}
-                        >
-                          {row.dias_1_2 > 0 ? (
-                            <span className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200">
-                              {row.dias_1_2.toLocaleString("pt-BR")}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-
-                        {/* Célula: 3 a 4 dias */}
-                        <td
-                          onClick={() => handleSelectCelula(row.nome_loja, "3_4_dias", row.dias_3_4)}
-                          className={cn(
-                            "py-2.5 px-3 text-center tabular-nums cursor-pointer transition",
-                            row.dias_3_4 > 0 ? "hover:bg-orange-50" : "text-slate-300",
-                            isLojaSelected && selectedFaixa === "3_4_dias" && FAIXA_CONFIG["3_4_dias"].cellActive,
-                          )}
-                        >
-                          {row.dias_3_4 > 0 ? (
-                            <span className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200">
-                              {row.dias_3_4.toLocaleString("pt-BR")}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-
-                        {/* Célula: 5 a 6 dias */}
-                        <td
-                          onClick={() => handleSelectCelula(row.nome_loja, "5_6_dias", row.dias_5_6)}
-                          className={cn(
-                            "py-2.5 px-3 text-center tabular-nums cursor-pointer transition",
-                            row.dias_5_6 > 0 ? "hover:bg-orange-100" : "text-slate-300",
-                            isLojaSelected && selectedFaixa === "5_6_dias" && FAIXA_CONFIG["5_6_dias"].cellActive,
-                          )}
-                        >
-                          {row.dias_5_6 > 0 ? (
-                            <span className="inline-block rounded-md px-2 py-0.5 text-xs font-bold text-orange-950 bg-orange-100 border border-orange-300">
-                              {row.dias_5_6.toLocaleString("pt-BR")}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-
-                        {/* Célula: 7 a 10 dias */}
-                        <td
-                          onClick={() => handleSelectCelula(row.nome_loja, "7_10_dias", row.dias_7_10)}
-                          className={cn(
-                            "py-2.5 px-3 text-center tabular-nums cursor-pointer transition",
-                            row.dias_7_10 > 0 ? "hover:bg-rose-50" : "text-slate-300",
-                            isLojaSelected && selectedFaixa === "7_10_dias" && FAIXA_CONFIG["7_10_dias"].cellActive,
-                          )}
-                        >
-                          {row.dias_7_10 > 0 ? (
-                            <span className="inline-block rounded-md px-2 py-0.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300">
-                              {row.dias_7_10.toLocaleString("pt-BR")}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-
-                        {/* Célula: 11 dias ou mais */}
-                        <td
-                          onClick={() => handleSelectCelula(row.nome_loja, "11_mais", row.dias_11_mais)}
-                          className={cn(
-                            "py-2.5 px-3 text-center tabular-nums cursor-pointer transition",
-                            row.dias_11_mais > 0 ? "hover:bg-purple-100" : "text-slate-300",
-                            isLojaSelected && selectedFaixa === "11_mais" && FAIXA_CONFIG["11_mais"].cellActive,
-                          )}
-                        >
-                          {row.dias_11_mais > 0 ? (
-                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
-                              {row.dias_11_mais.toLocaleString("pt-BR")}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* 3. LISTA DETALHADA DE PEDIDOS (DRILL-DOWN) */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            {/* Header do Drill-down com Banner de Filtro Ativo e Exportação */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/80 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Layers className="size-4 text-indigo-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Lista Detalhada de Pedidos
-                </h3>
-
-                {/* Badge Dinâmico de Filtro Ativo na Matriz */}
-                {selectedLoja || selectedFaixa ? (
-                  <div className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 text-xs text-indigo-900 font-medium">
-                    <span>
-                      Filtrando por:{" "}
-                      {selectedLoja && <strong>{selectedLoja}</strong>}
-                      {selectedLoja && selectedFaixa && " › "}
-                      {selectedFaixa && (
-                        <span className="font-semibold text-indigo-700">
-                          {FAIXA_CONFIG[selectedFaixa].label}
-                        </span>
-                      )}
-                      {" ("}
-                      {pedidosDrillDown.length} pedidos{")"}
-                    </span>
+                    </div>
+                    {/* Botão Recolher Matriz */}
                     <button
                       type="button"
-                      onClick={limparSelecaoMatriz}
-                      className="rounded-full p-0.5 hover:bg-indigo-200 text-indigo-700 cursor-pointer"
-                      title="Limpar filtro de loja/faixa"
+                      onClick={() => setMatrizAberta(false)}
+                      className="inline-flex size-7 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/20 transition shrink-0"
+                      title="Recolher Matriz Aging"
                     >
-                      <X className="size-3.5" />
+                      <PanelLeftClose className="size-4" />
                     </button>
                   </div>
-                ) : (
-                  <span className="text-xs text-slate-500 font-medium">
-                    ({pedidosDrillDown.length.toLocaleString("pt-BR")} pedidos pendentes exibidos)
-                  </span>
-                )}
-              </div>
 
-              {/* Ações da Tabela Detalhada */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={exportarDrillDown}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
-                >
-                  <Download className="size-3.5 text-slate-500" />
-                  Exportar (.xlsx)
-                </button>
-              </div>
-            </div>
+                  {/* Botões de Ordenação */}
+                  <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 text-xs border-b border-slate-700">
+                    <span className="text-slate-400 text-[10px]">Ordenar:</span>
+                    <button
+                      type="button"
+                      onClick={() => { setOrdenarPor("smart"); setOrdemDesc(true); }}
+                      className={cn(
+                        "rounded-md px-2 py-0.5 text-[10px] font-semibold transition cursor-pointer",
+                        ordenarPor === "smart"
+                          ? "bg-amber-400 text-slate-950 font-bold"
+                          : "bg-white/10 text-slate-300 hover:bg-white/20",
+                      )}
+                    >
+                      ⚡ Criticidade
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setOrdenarPor("total"); setOrdemDesc(!ordemDesc); }}
+                      className={cn(
+                        "rounded-md px-2 py-0.5 text-[10px] font-semibold transition cursor-pointer",
+                        ordenarPor === "total"
+                          ? "bg-amber-400 text-slate-950 font-bold"
+                          : "bg-white/10 text-slate-300 hover:bg-white/20",
+                      )}
+                    >
+                      📦 Volume
+                    </button>
+                  </div>
 
-            {/* Tabela de Pedidos */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50/50 text-slate-600">
-                  <tr>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Data do Pedido</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Número do Pedido</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Nome da Loja</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Transportadora</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Origem</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Marca</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">UF Destino</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Escala Coleta</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Status Coleta</th>
-                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Situação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {paginadosDrillDown.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="py-8 text-center text-xs text-slate-400">
-                        Nenhum pedido encontrado para a seleção atual.
-                      </td>
-                    </tr>
-                  ) : (
-                    paginadosDrillDown.map((p) => {
-                      const faixa = classificarFaixa(p.escala_coleta);
-                      const config = FAIXA_CONFIG[faixa];
+                  {/* Tabela Matriz */}
+                  <div className="max-h-[calc(100vh-320px)] overflow-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-2xs">
+                        <tr>
+                          <th className="py-2.5 px-3 font-bold bg-slate-100 min-w-[140px]">Loja</th>
+                          <th className="py-2.5 px-2 font-bold text-center bg-slate-200/60 min-w-[55px]">Total</th>
+                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[55px]", FAIXA_CONFIG.no_prazo.bgHeader, FAIXA_CONFIG.no_prazo.textHeader)}>
+                            OK
+                          </th>
+                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[45px]", FAIXA_CONFIG["1_2_dias"].bgHeader, FAIXA_CONFIG["1_2_dias"].textHeader)}>
+                            1-2d
+                          </th>
+                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[45px]", FAIXA_CONFIG["3_4_dias"].bgHeader, FAIXA_CONFIG["3_4_dias"].textHeader)}>
+                            3-4d
+                          </th>
+                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[45px]", FAIXA_CONFIG["5_6_dias"].bgHeader, FAIXA_CONFIG["5_6_dias"].textHeader)}>
+                            5-6d
+                          </th>
+                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[50px]", FAIXA_CONFIG["7_10_dias"].bgHeader, FAIXA_CONFIG["7_10_dias"].textHeader)}>
+                            7-10d
+                          </th>
+                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[50px]", FAIXA_CONFIG["11_mais"].bgHeader, FAIXA_CONFIG["11_mais"].textHeader)}>
+                            11d+
+                          </th>
+                        </tr>
+                      </thead>
 
-                      return (
-                        <tr
-                          key={p.numero_pedido}
-                          className="hover:bg-slate-50/80 transition-colors"
-                        >
-                          <td className="py-3 px-4 text-slate-700 tabular-nums whitespace-nowrap">
-                            {p.data_pedido}
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {/* Linha de Totais Gerais */}
+                        <tr className="bg-slate-50 font-bold border-b-2 border-slate-200 text-slate-900 sticky top-10 z-10">
+                          <td className="py-2 px-3 uppercase text-[10px] tracking-wider text-slate-700 bg-slate-100">
+                            ⚡ TOTAL
                           </td>
-                          <td className="py-3 px-4 font-mono font-medium text-slate-900 whitespace-nowrap">
-                            {p.numero_pedido}
+                          <td className="py-2 px-2 text-center tabular-nums text-xs bg-slate-200/80">
+                            {totaisGerais.total.toLocaleString("pt-BR")}
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">
-                            {p.nome_loja}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                            {p.transportadora}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                            {p.origem}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                            {p.marca}
-                          </td>
-                          <td className="py-3 px-4 text-slate-700 font-semibold whitespace-nowrap">
-                            {p.uf_destino}
-                          </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span
-                              className={cn(
-                                "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] border",
-                                config.badgeStyle,
-                              )}
-                            >
-                              {p.escala_coleta}
+                          <td
+                            onClick={() => handleSelectFaixaGlobal("no_prazo")}
+                            className={cn(
+                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-emerald-100",
+                              selectedFaixa === "no_prazo" && selectedLoja === null ? FAIXA_CONFIG.no_prazo.cellActive : "",
+                            )}
+                          >
+                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-emerald-800 bg-emerald-100/70">
+                              {totaisGerais.no_prazo.toLocaleString("pt-BR")}
                             </span>
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200">
-                              {p.status_coleta}
+                          <td
+                            onClick={() => handleSelectFaixaGlobal("1_2_dias")}
+                            className={cn(
+                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-amber-100",
+                              selectedFaixa === "1_2_dias" && selectedLoja === null ? FAIXA_CONFIG["1_2_dias"].cellActive : "",
+                            )}
+                          >
+                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-amber-800 bg-amber-100/70">
+                              {totaisGerais.dias_1_2.toLocaleString("pt-BR")}
                             </span>
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap">
-                            <TooltipProvider delayDuration={300}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 cursor-default">
-                                    {p.situacao}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs text-xs">
-                                  {legendaSituacao(p.situacao) ?? p.situacao}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                          <td
+                            onClick={() => handleSelectFaixaGlobal("3_4_dias")}
+                            className={cn(
+                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-orange-100",
+                              selectedFaixa === "3_4_dias" && selectedLoja === null ? FAIXA_CONFIG["3_4_dias"].cellActive : "",
+                            )}
+                          >
+                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-orange-800 bg-orange-100/70">
+                              {totaisGerais.dias_3_4.toLocaleString("pt-BR")}
+                            </span>
+                          </td>
+                          <td
+                            onClick={() => handleSelectFaixaGlobal("5_6_dias")}
+                            className={cn(
+                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-orange-200",
+                              selectedFaixa === "5_6_dias" && selectedLoja === null ? FAIXA_CONFIG["5_6_dias"].cellActive : "",
+                            )}
+                          >
+                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-orange-950 font-bold bg-orange-200/70">
+                              {totaisGerais.dias_5_6.toLocaleString("pt-BR")}
+                            </span>
+                          </td>
+                          <td
+                            onClick={() => handleSelectFaixaGlobal("7_10_dias")}
+                            className={cn(
+                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-rose-100",
+                              selectedFaixa === "7_10_dias" && selectedLoja === null ? FAIXA_CONFIG["7_10_dias"].cellActive : "",
+                            )}
+                          >
+                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-rose-800 font-bold bg-rose-100/80">
+                              {totaisGerais.dias_7_10.toLocaleString("pt-BR")}
+                            </span>
+                          </td>
+                          <td
+                            onClick={() => handleSelectFaixaGlobal("11_mais")}
+                            className={cn(
+                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-purple-200",
+                              selectedFaixa === "11_mais" && selectedLoja === null ? FAIXA_CONFIG["11_mais"].cellActive : "",
+                            )}
+                          >
+                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-purple-950 font-extrabold bg-purple-200/90">
+                              {totaisGerais.dias_11_mais.toLocaleString("pt-BR")}
+                            </span>
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
 
-            {/* Paginação da Tabela de Drill-down */}
-            {pedidosDrillDown.length > 0 && (
-              <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span>Itens por página:</span>
-                  <select
-                    value={porPagina}
-                    onChange={(e) => {
-                      setPorPagina(Number(e.target.value));
-                      setPagina(1);
-                    }}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                  <span>
-                    Exibindo {(paginaAtual - 1) * porPagina + 1} a{" "}
-                    {Math.min(paginaAtual * porPagina, pedidosDrillDown.length)} de{" "}
-                    {pedidosDrillDown.length.toLocaleString("pt-BR")}
-                  </span>
-                </div>
+                        {/* Linhas de Cada Loja */}
+                        {matrizLojas.map((row) => {
+                          const isLojaSelected = selectedLoja === row.nome_loja;
 
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={paginaAtual <= 1}
-                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Página anterior"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                  <span className="px-2 font-medium">
-                    Página {paginaAtual} de {totalPaginas}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={paginaAtual >= totalPaginas}
-                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Próxima página"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
+                          return (
+                            <tr
+                              key={row.nome_loja}
+                              className={cn(
+                                "transition-colors hover:bg-slate-50",
+                                isLojaSelected && "bg-indigo-50/40",
+                              )}
+                            >
+                              <td
+                                onClick={() => handleSelectLoja(row.nome_loja)}
+                                className="py-2 px-3 font-semibold text-slate-800 cursor-pointer hover:text-indigo-600 transition text-xs"
+                                title="Clique para filtrar apenas esta loja"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span className="truncate max-w-[120px]">{row.nome_loja}</span>
+                                  {isLojaSelected && selectedFaixa === null && (
+                                    <span className="rounded-full bg-indigo-600 px-1 py-0.2 text-[8px] font-bold text-white shrink-0">✓</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              <td
+                                onClick={() => handleSelectLoja(row.nome_loja)}
+                                className="py-2 px-2 text-center tabular-nums font-bold text-slate-900 cursor-pointer hover:bg-slate-100 text-xs"
+                              >
+                                {row.total.toLocaleString("pt-BR")}
+                              </td>
+
+                              {/* No Prazo */}
+                              <td
+                                onClick={() => handleSelectCelula(row.nome_loja, "no_prazo", row.no_prazo)}
+                                className={cn(
+                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
+                                  row.no_prazo > 0 ? "hover:bg-emerald-50" : "text-slate-300",
+                                  isLojaSelected && selectedFaixa === "no_prazo" && FAIXA_CONFIG.no_prazo.cellActive,
+                                )}
+                              >
+                                {row.no_prazo > 0 ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100">
+                                    {row.no_prazo.toLocaleString("pt-BR")}
+                                  </span>
+                                ) : "—"}
+                              </td>
+
+                              {/* 1 a 2 dias */}
+                              <td
+                                onClick={() => handleSelectCelula(row.nome_loja, "1_2_dias", row.dias_1_2)}
+                                className={cn(
+                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
+                                  row.dias_1_2 > 0 ? "hover:bg-amber-50" : "text-slate-300",
+                                  isLojaSelected && selectedFaixa === "1_2_dias" && FAIXA_CONFIG["1_2_dias"].cellActive,
+                                )}
+                              >
+                                {row.dias_1_2 > 0 ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200">
+                                    {row.dias_1_2.toLocaleString("pt-BR")}
+                                  </span>
+                                ) : "—"}
+                              </td>
+
+                              {/* 3 a 4 dias */}
+                              <td
+                                onClick={() => handleSelectCelula(row.nome_loja, "3_4_dias", row.dias_3_4)}
+                                className={cn(
+                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
+                                  row.dias_3_4 > 0 ? "hover:bg-orange-50" : "text-slate-300",
+                                  isLojaSelected && selectedFaixa === "3_4_dias" && FAIXA_CONFIG["3_4_dias"].cellActive,
+                                )}
+                              >
+                                {row.dias_3_4 > 0 ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200">
+                                    {row.dias_3_4.toLocaleString("pt-BR")}
+                                  </span>
+                                ) : "—"}
+                              </td>
+
+                              {/* 5 a 6 dias */}
+                              <td
+                                onClick={() => handleSelectCelula(row.nome_loja, "5_6_dias", row.dias_5_6)}
+                                className={cn(
+                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
+                                  row.dias_5_6 > 0 ? "hover:bg-orange-100" : "text-slate-300",
+                                  isLojaSelected && selectedFaixa === "5_6_dias" && FAIXA_CONFIG["5_6_dias"].cellActive,
+                                )}
+                              >
+                                {row.dias_5_6 > 0 ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold text-orange-950 bg-orange-100 border border-orange-300">
+                                    {row.dias_5_6.toLocaleString("pt-BR")}
+                                  </span>
+                                ) : "—"}
+                              </td>
+
+                              {/* 7 a 10 dias */}
+                              <td
+                                onClick={() => handleSelectCelula(row.nome_loja, "7_10_dias", row.dias_7_10)}
+                                className={cn(
+                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
+                                  row.dias_7_10 > 0 ? "hover:bg-rose-50" : "text-slate-300",
+                                  isLojaSelected && selectedFaixa === "7_10_dias" && FAIXA_CONFIG["7_10_dias"].cellActive,
+                                )}
+                              >
+                                {row.dias_7_10 > 0 ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-300">
+                                    {row.dias_7_10.toLocaleString("pt-BR")}
+                                  </span>
+                                ) : "—"}
+                              </td>
+
+                              {/* 11 dias ou mais */}
+                              <td
+                                onClick={() => handleSelectCelula(row.nome_loja, "11_mais", row.dias_11_mais)}
+                                className={cn(
+                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
+                                  row.dias_11_mais > 0 ? "hover:bg-purple-100" : "text-slate-300",
+                                  isLojaSelected && selectedFaixa === "11_mais" && FAIXA_CONFIG["11_mais"].cellActive,
+                                )}
+                              >
+                                {row.dias_11_mais > 0 ? (
+                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
+                                    {row.dias_11_mais.toLocaleString("pt-BR")}
+                                  </span>
+                                ) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* COLUNA DIREITA: Lista Detalhada (65-70% ou 100% quando retraída) */}
+            <div className={matrizAberta ? "lg:col-span-8 xl:col-span-8 min-w-0" : "lg:col-span-12 min-w-0"}>
+              {/* Botão para reabrir a Matriz quando retraída */}
+              {!matrizAberta && (
+                <button
+                  type="button"
+                  onClick={() => setMatrizAberta(true)}
+                  className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
+                >
+                  <PanelLeftOpen className="size-3.5 text-indigo-600" />
+                  Matriz Aging
+                </button>
+              )}
+
+              {/* 3. LISTA DETALHADA DE PEDIDOS (DRILL-DOWN) */}
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                {/* Header do Drill-down */}
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Layers className="size-4 text-indigo-600" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Lista Detalhada de Pedidos
+                    </h3>
+
+                    {selectedLoja || selectedFaixa ? (
+                      <div className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 text-xs text-indigo-900 font-medium">
+                        <span>
+                          Filtrando por:{" "}
+                          {selectedLoja && <strong>{selectedLoja}</strong>}
+                          {selectedLoja && selectedFaixa && " › "}
+                          {selectedFaixa && (
+                            <span className="font-semibold text-indigo-700">
+                              {FAIXA_CONFIG[selectedFaixa].label}
+                            </span>
+                          )}
+                          {" ("}
+                          {pedidosDrillDown.length} pedidos{")"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={limparSelecaoMatriz}
+                          className="rounded-full p-0.5 hover:bg-indigo-200 text-indigo-700 cursor-pointer"
+                          title="Limpar filtro de loja/faixa"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-500 font-medium">
+                        ({pedidosDrillDown.length.toLocaleString("pt-BR")} pedidos pendentes exibidos)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={exportarDrillDown}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
+                    >
+                      <Download className="size-3.5 text-slate-500" />
+                      Exportar (.xlsx)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tabela de Pedidos */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50/50 text-slate-600">
+                      <tr>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Data do Pedido</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Número do Pedido</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Romaneio</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Nome da Loja</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Transportadora</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Origem</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Marca</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">UF Destino</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Escala Coleta</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Status Coleta</th>
+                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Situação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {paginadosDrillDown.length === 0 ? (
+                        <tr>
+                          <td colSpan={11} className="py-8 text-center text-xs text-slate-400">
+                            Nenhum pedido encontrado para a seleção atual.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginadosDrillDown.map((p) => {
+                          const faixa = classificarFaixa(p.escala_coleta);
+                          const config = FAIXA_CONFIG[faixa];
+
+                          return (
+                            <tr
+                              key={p.numero_pedido}
+                              className="hover:bg-slate-50/80 transition-colors"
+                            >
+                              <td className="py-3 px-4 text-slate-700 tabular-nums whitespace-nowrap">
+                                {p.data_pedido}
+                              </td>
+                              <td className="py-3 px-4 font-mono font-medium text-slate-900 whitespace-nowrap">
+                                {p.numero_pedido}
+                              </td>
+                              <td className="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">
+                                {p.romaneio ?? "—"}
+                              </td>
+                              <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">
+                                {p.nome_loja}
+                              </td>
+                              <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                                {p.transportadora}
+                              </td>
+                              <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                                {p.origem}
+                              </td>
+                              <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                                {p.marca}
+                              </td>
+                              <td className="py-3 px-4 text-slate-700 font-semibold whitespace-nowrap">
+                                {p.uf_destino}
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] border",
+                                    config.badgeStyle,
+                                  )}
+                                >
+                                  {p.escala_coleta}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200">
+                                  {p.status_coleta}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <TooltipProvider delayDuration={300}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 cursor-default">
+                                        {p.situacao}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs text-xs">
+                                      {legendaSituacao(p.situacao) ?? p.situacao}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Paginação da Tabela de Drill-down */}
+                {pedidosDrillDown.length > 0 && (
+                  <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <span>Itens por página:</span>
+                      <select
+                        value={porPagina}
+                        onChange={(e) => {
+                          setPorPagina(Number(e.target.value));
+                          setPagina(1);
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span>
+                        Exibindo {(paginaAtual - 1) * porPagina + 1} a{" "}
+                        {Math.min(paginaAtual * porPagina, pedidosDrillDown.length)} de{" "}
+                        {pedidosDrillDown.length.toLocaleString("pt-BR")}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={paginaAtual <= 1}
+                        onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                        className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Página anterior"
+                      >
+                        <ChevronLeft className="size-4" />
+                      </button>
+                      <span className="px-2 font-medium">
+                        Página {paginaAtual} de {totalPaginas}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={paginaAtual >= totalPaginas}
+                        onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                        className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Próxima página"
+                      >
+                        <ChevronRight className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </main>
       </div>

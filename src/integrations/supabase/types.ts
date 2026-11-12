@@ -58,6 +58,7 @@ export type Database = {
           marca: string
           nome_loja: string
           numero_pedido: string
+          romaneio?: string | null
           origem: string
           situacao: string
           situacao_updated_at: string | null
@@ -80,6 +81,7 @@ export type Database = {
           marca?: string
           nome_loja?: string
           numero_pedido: string
+          romaneio?: string | null
           origem?: string
           situacao?: string
           situacao_updated_at?: string | null
@@ -102,6 +104,7 @@ export type Database = {
           marca?: string
           nome_loja?: string
           numero_pedido?: string
+          romaneio?: string | null
           origem?: string
           situacao?: string
           situacao_updated_at?: string | null

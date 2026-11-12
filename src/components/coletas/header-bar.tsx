@@ -74,51 +74,53 @@ export function HeaderBar({
   return (
     <header className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        {/* Esquerda: Título, Status da Base e Identificação */}
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <img
-              src={darkLogo.url}
-              alt="AZZAS 2154"
-              className="h-7 w-auto shrink-0 dark:hidden"
-            />
-            <img
-              src={lightLogo.url}
-              alt="AZZAS 2154"
-              className="hidden h-7 w-auto shrink-0 dark:block"
-            />
-            <span className="h-6 w-px bg-slate-200" aria-hidden="true" />
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Painel de Coletas <span className="font-normal text-slate-400">—</span> SFS Convencional
-            </h1>
+        {/* Esquerda: Botão Menu + Título, Status da Base e Identificação */}
+        <div className="flex items-start gap-3">
+          {/* Botão retrátil de Menu Lateral — canto superior esquerdo */}
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            title="Abrir/fechar menu lateral"
+          >
+            <PanelLeft className="size-4 text-indigo-600" />
+          </button>
 
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
-              </span>
-              {totalBase} pedido(s) na base compartilhada
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <img
+                src={darkLogo.url}
+                alt="AZZAS 2154"
+                className="h-7 w-auto shrink-0 dark:hidden"
+              />
+              <img
+                src={lightLogo.url}
+                alt="AZZAS 2154"
+                className="hidden h-7 w-auto shrink-0 dark:block"
+              />
+              <span className="h-6 w-px bg-slate-200" aria-hidden="true" />
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+                Painel de Coletas <span className="font-normal text-slate-400">—</span> SFS Convencional
+              </h1>
+
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+                </span>
+                {totalBase} pedido(s) na base compartilhada
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>Operando como:</span>
-            <span className="min-w-0 break-all font-semibold text-slate-700">{usuario}</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>Operando como:</span>
+              <span className="min-w-0 break-all font-semibold text-slate-700">{usuario}</span>
+            </div>
           </div>
         </div>
 
         {/* Direita: Ações Consolidadas */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botão de Atalho: Menu Lateral */}
-          <button
-            type="button"
-            onClick={onOpenAdmin}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98] cursor-pointer"
-            title="Abrir menu lateral de navegação"
-          >
-            <PanelLeft className="size-4 text-indigo-600" />
-            <span>Menu Lateral</span>
-          </button>
 
           {/* Botão Primário: Importar Planilha */}
           <button

@@ -1,5 +1,6 @@
 export type Pedido = {
   numero_pedido: string;
+  romaneio?: string | null;
   data_pedido: string;
   nome_loja: string;
   transportadora: string;
@@ -125,6 +126,7 @@ export function nivelSla(escala?: string | null): NivelSla {
 export const FIELD_LABELS = {
   data_pedido: "Data do Pedido",
   numero_pedido: "Número do Pedido",
+  romaneio: "Romaneio",
   nome_loja: "Nome da Loja",
   transportadora: "Transportadora",
   origem: "Origem",
@@ -139,6 +141,7 @@ export const FIELD_LABELS = {
 export const DISPLAY_ORDER = [
   "data_pedido",
   "numero_pedido",
+  "romaneio",
   "nome_loja",
   "transportadora",
   "origem",

@@ -51,6 +51,7 @@ import {
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
 import { AgingBacklogView } from "@/components/aging/aging-backlog-view";
+import { useFilters } from "@/contexts/filters-context";
 
 export const Route = createFileRoute("/")(
   {
@@ -91,13 +92,20 @@ function Painel() {
   // ─── Estado de Usuário ───
   const [usuario, setUsuario] = useState("");
 
-  // ─── Filtros Globais (Barra no topo) ───
-  const [filtroDataInicio, setFiltroDataInicio] = useState("");
-  const [filtroDataFim, setFiltroDataFim] = useState("");
-  const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
-  const [filtroOrigem, setFiltroOrigem] = useState<string[]>([]);
-  const [filtroTransportadora, setFiltroTransportadora] = useState<string[]>([]);
-  const [filtroEscala, setFiltroEscala] = useState<string[]>([]);
+  // ─── Filtros Globais compartilhados (via contexto) ───
+  const {
+    filtroDataInicio, setFiltroDataInicio,
+    filtroDataFim, setFiltroDataFim,
+    filtroMarca, setFiltroMarca,
+    filtroOrigem, setFiltroOrigem,
+    filtroTransportadora, setFiltroTransportadora,
+    filtroEscala, setFiltroEscala,
+    filtroLoja, setFiltroLoja,
+    buscaTags, setBuscaTags,
+    buscaTexto, setBuscaTexto,
+    filtroContato, setFiltroContato,
+    limparFiltrosGlobais: limparFiltrosCtx,
+  } = useFilters();
 
   // ─── Filtros de Painel (KPIs, Ranking, Busca) ───
   const [filtroKpiCard, setFiltroKpiCard] = useState<
@@ -105,10 +113,6 @@ function Painel() {
   >(null);
   const [filtroColeta, setFiltroColeta] = useState<string | null>(null);
   const [filtroSituacao, setFiltroSituacao] = useState<string[]>([]);
-  const [filtroLoja, setFiltroLoja] = useState<string[]>([]);
-  const [filtroContato, setFiltroContato] = useState("");
-  const [buscaTags, setBuscaTags] = useState<string[]>([]);
-  const [buscaTexto, setBuscaTexto] = useState("");
 
   // ─── Tabela & Bulk ───
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -312,7 +316,7 @@ function Painel() {
       if (todosTermos.length > 0) {
         const hay = DISPLAY_ORDER.map((f) => String(p[f] ?? ""))
           .join(" ")
-          .toLowerCase();
+          .toLowerCase() + " " + (p.romaneio ?? "").toLowerCase();
         const bateu = todosTermos.some((t) => hay.includes(t));
         if (!bateu) return false;
       }
@@ -477,17 +481,10 @@ function Painel() {
     !!buscaTexto;
 
   function limparFiltrosGlobais() {
-    setFiltroDataInicio("");
-    setFiltroDataFim("");
-    setFiltroMarca([]);
-    setFiltroOrigem([]);
-    setFiltroTransportadora([]);
-    setFiltroLoja([]);
-    setFiltroEscala([]);
+    limparFiltrosCtx();
     setFiltroKpiCard(null);
     setFiltroSituacao([]);
-    setBuscaTags([]);
-    setBuscaTexto("");
+    setFiltroColeta(null);
   }
 
   // ─── Handlers ───
