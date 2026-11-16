@@ -4,13 +4,15 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { FiltersProvider } from "@/contexts/filters-context";
-import { SidebarProvider } from "@/contexts/sidebar-context";
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
+import { cn } from "@/lib/utils";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -123,7 +125,28 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootContent() {
-  return <Outlet />;
+  const { isPinned } = useSidebar();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthPage = pathname.startsWith("/auth") || pathname.startsWith("/reset-password");
+
+  if (isAuthPage) {
+    return <Outlet />;
+  }
+
+  return (
+    <div
+      className={cn(
+        "min-h-screen w-full max-w-full overflow-x-hidden min-w-0 flex-1 transition-all duration-300 ease-in-out",
+        isPinned ? "pl-64" : "pl-16",
+      )}
+      style={{
+        paddingLeft: isPinned ? "16rem" : "4rem",
+        transition: "padding-left 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+      }}
+    >
+      <Outlet />
+    </div>
+  );
 }
 
 function RootComponent() {
