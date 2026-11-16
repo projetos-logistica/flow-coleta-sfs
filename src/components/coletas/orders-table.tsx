@@ -438,6 +438,7 @@ export function OrdersTable({
             <option value={50}>50</option>
             <option value={100}>100</option>
             <option value={200}>200</option>
+            <option value={500}>500</option>
           </select>
           <span className="text-slate-400">({totalRegistros} resultados)</span>
         </div>

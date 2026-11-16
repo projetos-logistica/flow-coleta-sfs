@@ -345,14 +345,21 @@ export function AgingBacklogView({
     );
   }, [matrizLojas]);
 
-  // Função para lidar com clique no cabeçalho
+  // Função para lidar com clique no cabeçalho (Ciclo de 3 estados: 1º DESC -> 2º ASC -> 3º Restaura Smart)
   function handleHeaderSort(col: SortColumn) {
     if (ordenarPor === col) {
-      setOrdemDesc((prev) => !prev);
+      if (ordemDesc) {
+        // 2º clique: Alterna para ASC (ordem crescente)
+        setOrdemDesc(false);
+      } else {
+        // 3º clique: Desmarca a ordenação ativa e retorna para a criticidade padrão inicial (Smart)
+        setOrdenarPor("smart");
+        setOrdemDesc(true);
+      }
     } else {
+      // 1º clique: Ativa a coluna com ordem decrescente (DESC)
       setOrdenarPor(col);
-      // Para nome padrão é A->Z (ASC = false), para contadores numéricos padrão é DESC (true)
-      setOrdemDesc(col === "nome" ? false : true);
+      setOrdemDesc(true);
     }
   }
 
@@ -785,14 +792,23 @@ export function AgingBacklogView({
                     setOrdemDesc(true);
                   }}
                   className={cn(
-                    "rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer",
+                    "rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5",
                     ordenarPor === "smart"
                       ? "bg-amber-400 text-slate-950 font-bold shadow-xs"
-                      : "text-slate-300 hover:bg-white/10",
+                      : "text-slate-300 hover:bg-white/10 hover:text-white",
                   )}
-                  title="Ordenar por criticidade (pedidos com 11+ dias primeiro)"
+                  title={
+                    ordenarPor === "smart"
+                      ? "Ordenação padrão por criticidade ativa (pedidos com 11+ dias primeiro)"
+                      : "Clique para limpar a ordenação da coluna e restaurar a Criticidade Smart"
+                  }
                 >
-                  ⚡ Criticidade (Smart)
+                  <span>⚡ Criticidade (Smart)</span>
+                  {ordenarPor !== "smart" && (
+                    <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-amber-300 font-normal">
+                      Restaurar
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -812,7 +828,7 @@ export function AgingBacklogView({
           {/* Dica de interação */}
           <div className="bg-slate-50 border-b border-slate-200 px-5 py-2 flex items-center justify-between text-xs text-slate-500">
             <span>
-              💡 Clique nos cabeçalhos das colunas (<strong>Total</strong>, <strong>OK</strong>, <strong>1-2d</strong>, <strong>3-4d</strong>, <strong>5-6d</strong>, <strong>7-10d</strong>, <strong>11d+</strong>) para ordenar de forma crescente ou decrescente.
+              💡 Clique nos cabeçalhos para alternar a ordenação: <strong>1º Decrescente</strong> → <strong>2º Crescente</strong> → <strong>3º Restaurar Criticidade (Smart)</strong>.
             </span>
             <span className="text-[11px] font-medium text-slate-400">
               {matrizLojas.length} registros

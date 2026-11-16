@@ -6,10 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Redefinir senha — Painel de Coletas SFS Convencional" },
-      { name: "description", content: "Defina uma nova senha para acessar o Painel de Coletas - SFS Convencional." },
-      { property: "og:title", content: "Redefinir senha — Painel de Coletas SFS Convencional" },
-      { property: "og:description", content: "Defina uma nova senha para acessar o Painel de Coletas - SFS Convencional." },
+      { title: "Redefinir senha — Painel de Coletas Ship From Store" },
+      { name: "description", content: "Defina uma nova senha para acessar o Painel de Coletas - Ship From Store." },
+      { property: "og:title", content: "Redefinir senha — Painel de Coletas Ship From Store" },
+      { property: "og:description", content: "Defina uma nova senha para acessar o Painel de Coletas - Ship From Store." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

@@ -4,15 +4,13 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { FiltersProvider } from "@/contexts/filters-context";
-import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
-import { cn } from "@/lib/utils";
+import { SidebarProvider } from "@/contexts/sidebar-context";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -82,10 +80,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Painel de Coletas - SFS Convencional" },
+      { title: "Painel de Coletas - Ship From Store" },
       {
         name: "description",
-        content: "Painel compartilhado de pedidos pendentes de coleta em tempo real - SFS Convencional.",
+        content: "Painel compartilhado de pedidos pendentes de coleta em tempo real - Ship From Store.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -125,28 +123,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootContent() {
-  const { isPinned } = useSidebar();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isAuthPage = pathname.startsWith("/auth") || pathname.startsWith("/reset-password");
-
-  if (isAuthPage) {
-    return <Outlet />;
-  }
-
-  return (
-    <div
-      className={cn(
-        "min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300 ease-in-out",
-        isPinned ? "pl-64" : "pl-16",
-      )}
-      style={{
-        paddingLeft: isPinned ? "16rem" : "4rem",
-        transition: "padding-left 300ms cubic-bezier(0.4, 0, 0.2, 1)",
-      }}
-    >
-      <Outlet />
-    </div>
-  );
+  return <Outlet />;
 }
 
 function RootComponent() {

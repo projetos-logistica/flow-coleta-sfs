@@ -59,17 +59,17 @@ export const Route = createFileRoute("/")(
     },
     head: () => ({
       meta: [
-        { title: "Painel de Coletas - SFS Convencional" },
+        { title: "Painel de Coletas - Ship From Store" },
         {
           name: "description",
           content:
-            "Painel compartilhado de pedidos pendentes de coleta - SFS Convencional: importe a planilha, acompanhe status em tempo real e registre o histórico de alterações.",
+            "Painel compartilhado de pedidos pendentes de coleta - Ship From Store: importe a planilha, acompanhe status em tempo real e registre o histórico de alterações.",
         },
-        { property: "og:title", content: "Painel de Coletas - SFS Convencional" },
+        { property: "og:title", content: "Painel de Coletas - Ship From Store" },
         {
           property: "og:description",
           content:
-            "Controle compartilhado de coletas - SFS Convencional com importação de planilha, KPIs, ranking de lojas e auditoria de alterações.",
+            "Controle compartilhado de coletas - Ship From Store com importação de planilha, KPIs, ranking de lojas e auditoria de alterações.",
         },
         { property: "og:type", content: "website" },
         { name: "twitter:card", content: "summary_large_image" },
@@ -121,6 +121,13 @@ function Painel() {
   const [progressoImportacao, setProgressoImportacao] = useState<ProgressoImportacao | null>(null);
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState(10);
+  const [aplicandoLote, setAplicandoLote] = useState(false);
+  const [progressoLote, setProgressoLote] = useState<{
+    lote: number;
+    totalLotes: number;
+    processados: number;
+    total: number;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ─── Init usuário (padrão: parte do e-mail antes do @) ───
@@ -487,21 +494,65 @@ function Painel() {
 
   async function alterarCampo(pedido: Pedido, campo: EditableField, valor: string) {
     try {
-      await aplicarStatus.mutateAsync({ pedidos: [pedido], field: campo, value: valor });
+      const res = await aplicarStatus.mutateAsync({ pedidos: [pedido], field: campo, value: valor });
+      if (res.falhas.length > 0) {
+        toast.error(`Falha ao alterar ${FIELD_LABELS[campo]}. Tente novamente.`);
+      }
     } catch (e) {
       toast.error(mensagemAmigavel(e, "Não consegui salvar a alteração"));
     }
   }
 
   async function aplicarEmMassa(campo: EditableField, valor: string) {
+    if (selecionados.size === 0 || aplicandoLote) return;
     const alvos = filtrados.filter((p) => selecionados.has(p.numero_pedido));
     if (alvos.length === 0) return;
+
+    setAplicandoLote(true);
+    setProgressoLote(null);
+
+    const totalLotes = Math.ceil(alvos.length / 50);
+    const toastId = alvos.length > 50
+      ? toast.loading(`Iniciando atualização de ${alvos.length} pedidos em lotes...`, { duration: 120000 })
+      : undefined;
+
     try {
-      const n = await aplicarStatus.mutateAsync({ pedidos: alvos, field: campo, value: valor });
-      toast.success(`${n} pedido(s) atualizado(s) em ${FIELD_LABELS[campo]}.`);
-      setSelecionados(new Set());
+      const resultado = await aplicarStatus.mutateAsync({
+        pedidos: alvos,
+        field: campo,
+        value: valor,
+        onProgress: (processados, total, loteAtual, numLotes) => {
+          setProgressoLote({ lote: loteAtual, totalLotes: numLotes, processados, total });
+          if (toastId) {
+            toast.loading(
+              `Atualizando lote ${loteAtual} de ${numLotes} (${processados} de ${total} pedidos)...`,
+              { id: toastId, duration: 120000 },
+            );
+          }
+        },
+      });
+
+      if (toastId) toast.dismiss(toastId);
+
+      if (resultado.falhas.length === 0) {
+        toast.success(
+          `${resultado.sucessos.length} pedido(s) atualizado(s) em ${FIELD_LABELS[campo]}.`,
+        );
+        setSelecionados(new Set());
+      } else {
+        // Se houve falha após as retentativas, mantém apenas os não salvos selecionados
+        setSelecionados(new Set(resultado.falhas));
+        toast.warning(
+          `${resultado.sucessos.length} de ${alvos.length} pedidos atualizados com êxito. Ocorreu falha de conexão em ${resultado.falhas.length} pedido(s) após 3 tentativas. Eles continuam selecionados na tabela para você tentar novamente.`,
+          { duration: 10000 },
+        );
+      }
     } catch (e) {
+      if (toastId) toast.dismiss(toastId);
       toast.error(mensagemAmigavel(e, "Não consegui aplicar a alteração em massa"));
+    } finally {
+      setAplicandoLote(false);
+      setProgressoLote(null);
     }
   }
 
@@ -895,9 +946,9 @@ function Painel() {
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-xs text-indigo-900">
               <span className="font-bold">{totalSelecionados} selecionado(s)</span>
 
-
               <select
-                className="rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs"
+                disabled={aplicandoLote}
+                className="rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs disabled:opacity-50"
                 value={bulk.contato}
                 onChange={(e) => setBulk({ ...bulk, contato: e.target.value })}
               >
@@ -907,14 +958,25 @@ function Painel() {
               </select>
               <button
                 type="button"
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                disabled={aplicandoLote}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition",
+                  aplicandoLote
+                    ? "bg-indigo-400 cursor-not-allowed opacity-75"
+                    : "bg-indigo-600 hover:bg-indigo-700 cursor-pointer",
+                )}
                 onClick={() => aplicarEmMassa("status_contato", bulk.contato)}
               >
-                Aplicar Contato
+                {aplicandoLote && progressoLote
+                  ? `Atualizando ${progressoLote.lote}/${progressoLote.totalLotes}...`
+                  : aplicandoLote
+                  ? "Salvando..."
+                  : "Aplicar Contato"}
               </button>
 
               <select
-                className="rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs"
+                disabled={aplicandoLote}
+                className="rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs disabled:opacity-50"
                 value={bulk.situacao}
                 onChange={(e) => setBulk({ ...bulk, situacao: e.target.value })}
               >
@@ -924,15 +986,26 @@ function Painel() {
               </select>
               <button
                 type="button"
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                disabled={aplicandoLote}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition",
+                  aplicandoLote
+                    ? "bg-indigo-400 cursor-not-allowed opacity-75"
+                    : "bg-indigo-600 hover:bg-indigo-700 cursor-pointer",
+                )}
                 onClick={() => aplicarEmMassa("situacao", bulk.situacao)}
               >
-                Aplicar Situação
+                {aplicandoLote && progressoLote
+                  ? `Atualizando ${progressoLote.lote}/${progressoLote.totalLotes}...`
+                  : aplicandoLote
+                  ? "Salvando..."
+                  : "Aplicar Situação"}
               </button>
 
               <button
                 type="button"
-                className="ml-auto rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                disabled={aplicandoLote}
+                className="ml-auto rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 cursor-pointer"
                 onClick={() => setSelecionados(new Set())}
               >
                 Limpar seleção

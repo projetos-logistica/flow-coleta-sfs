@@ -82,7 +82,7 @@ export function HeaderBar({
             </div>
             <span className="h-6 w-px bg-slate-200" aria-hidden="true" />
             <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Painel de Coletas <span className="font-normal text-slate-400">—</span> SFS Convencional
+              Painel de Coletas <span className="font-normal text-slate-400">—</span> Ship From Store
             </h1>
 
             <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">

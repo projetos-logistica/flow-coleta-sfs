@@ -11,10 +11,10 @@ const DOMINIOS_PERMITIDOS = ["somagrupo.com.br", "usereserva.com"];
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — Painel de Coletas SFS Convencional" },
-      { name: "description", content: "Acesse o Painel de Coletas - SFS Convencional com sua conta." },
-      { property: "og:title", content: "Entrar — Painel de Coletas SFS Convencional" },
-      { property: "og:description", content: "Acesse o Painel de Coletas - SFS Convencional com sua conta." },
+      { title: "Entrar — Painel de Coletas Ship From Store" },
+      { name: "description", content: "Acesse o Painel de Coletas - Ship From Store com sua conta." },
+      { property: "og:title", content: "Entrar — Painel de Coletas Ship From Store" },
+      { property: "og:description", content: "Acesse o Painel de Coletas - Ship From Store com sua conta." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
