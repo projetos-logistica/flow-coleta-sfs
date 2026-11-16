@@ -47,6 +47,7 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
 import { AgingBacklogView } from "@/components/aging/aging-backlog-view";
 import { useFilters } from "@/contexts/filters-context";
+import { useSidebar } from "@/contexts/sidebar-context";
 
 export const Route = createFileRoute("/")(
   {
@@ -82,22 +83,7 @@ export const Route = createFileRoute("/")(
 function Painel() {
   // ─── Navegação Administrativa / Módulos ───
   const [telaAtual, setTelaAtual] = useState<"painel" | "aging" | "usuarios">("painel");
-  const [sidebarPinned, setSidebarPinned] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("flow_sidebar_pinned") === "true";
-    }
-    return false;
-  });
-
-  function toggleSidebarPin() {
-    setSidebarPinned((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("flow_sidebar_pinned", String(next));
-      }
-      return next;
-    });
-  }
+  const { isPinned: sidebarPinned, togglePin: toggleSidebarPin } = useSidebar();
 
   // ─── Estado de Usuário ───
   const [usuario, setUsuario] = useState("");
@@ -635,7 +621,7 @@ function Painel() {
 
   // ─── Render Global Shell (Barra Lateral Icon Rail Unificada) ───
   return (
-    <div className="flex min-h-screen w-full bg-[#f8fafc] text-slate-800 antialiased">
+    <div className="flex min-h-screen w-full max-w-full bg-[#f8fafc] text-slate-800 antialiased">
       <Toaster />
 
       {/* Barra Lateral Global Estilo "Icon Rail" (Collapsed w-16 + Hover w-64 + Pin) */}
@@ -648,12 +634,7 @@ function Painel() {
       />
 
       {/* Área de Conteúdo da Rota Ativa */}
-      <div
-        className={cn(
-          "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out",
-          sidebarPinned ? "pl-64" : "pl-16",
-        )}
-      >
+      <div className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden">
         {telaAtual === "usuarios" ? (
           <UsuariosAprovacoesView
             usuarioIdent={usuario}
