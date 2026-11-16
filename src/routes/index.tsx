@@ -42,12 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PanelLeftOpen, Copy, AlertTriangle } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
 import { AgingBacklogView } from "@/components/aging/aging-backlog-view";
@@ -87,7 +82,22 @@ export const Route = createFileRoute("/")(
 function Painel() {
   // ─── Navegação Administrativa / Módulos ───
   const [telaAtual, setTelaAtual] = useState<"painel" | "aging" | "usuarios">("painel");
-  const [sheetAdminAberta, setSheetAdminAberta] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("flow_sidebar_pinned") === "true";
+    }
+    return false;
+  });
+
+  function toggleSidebarPin() {
+    setSidebarPinned((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("flow_sidebar_pinned", String(next));
+      }
+      return next;
+    });
+  }
 
   // ─── Estado de Usuário ───
   const [usuario, setUsuario] = useState("");
@@ -623,117 +633,100 @@ function Painel() {
 
   const totalSelecionados = filtrados.filter((p) => selecionados.has(p.numero_pedido)).length;
 
-  // ─── Render Condicional: Módulo de Usuários e Aprovações ───
-  if (telaAtual === "usuarios") {
-    return (
-      <>
-        <Toaster />
-        <UsuariosAprovacoesView
-          usuarioIdent={usuario}
-          onVoltarPainel={() => setTelaAtual("painel")}
-          onNavigate={(tela) => setTelaAtual(tela)}
-        />
-      </>
-    );
-  }
-
-  // ─── Render Condicional: Módulo de Aging de Backlog ───
-  if (telaAtual === "aging") {
-    return (
-      <>
-        <Toaster />
-        <AgingBacklogView
-          pedidos={pedidos}
-          usuario={usuario}
-          onVoltarPainel={() => setTelaAtual("painel")}
-          onNavigate={(tela) => setTelaAtual(tela)}
-          onChangeField={alterarCampo}
-        />
-      </>
-    );
-  }
-
-  // ─── Render: Painel Operacional ───
+  // ─── Render Global Shell (Barra Lateral Icon Rail Unificada) ───
   return (
-    <main className="min-h-screen w-full bg-dashboard px-4 pb-16 pt-7 sm:px-6" >
+    <div className="flex min-h-screen w-full bg-[#f8fafc] text-slate-800 antialiased">
       <Toaster />
 
-      {/* Menu Lateral Retrátil (Sidebar / Sheet) */}
-      <Sheet open={sheetAdminAberta} onOpenChange={setSheetAdminAberta}>
-        <SheetContent side="left" className="p-0 w-64 border-r border-slate-800/40 bg-[#0b1727] text-white">
-          <SheetTitle className="sr-only">Navegação Administrativa</SheetTitle>
-          <SheetDescription className="sr-only">
-            Menu lateral para alternar entre o Painel Operacional, Aging de Backlog e Usuários e Aprovações.
-          </SheetDescription>
-          <AdminSidebar
-            telaAtual={telaAtual}
-            onSelectTela={(tela) => {
-              setTelaAtual(tela);
-              setSheetAdminAberta(false);
-            }}
-            onClose={() => setSheetAdminAberta(false)}
-          />
-        </SheetContent>
-      </Sheet>
-
-      {/* Input de arquivo oculto */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onImportar(f);
-        }}
-      />
-
-      {/* Modal de Erro Detalhado (Importação) */}
-      <AlertDialog open={!!importError} onOpenChange={(open) => !open && setImportError(null)}>
-        <AlertDialogContent className="rounded-2xl border-rose-200 bg-white p-6 shadow-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-lg font-bold text-rose-600">
-              <AlertTriangle className="size-5" />
-              Falha na Importação
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-slate-600">
-              Ocorreu um erro ao processar a planilha. Por favor, verifique a mensagem abaixo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          <div className="my-2 max-h-48 overflow-y-auto rounded-lg bg-rose-50 p-3 text-xs font-mono text-rose-800 border border-rose-100">
-            {importError}
-          </div>
-
-          <AlertDialogFooter className="sm:justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(importError || "");
-                toast.success("Detalhes copiados para a área de transferência!");
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition"
-            >
-              <Copy className="size-3.5" /> Copiar detalhes
-            </button>
-            <AlertDialogAction className="bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-6">
-              Fechar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 1. CABEÇALHO CLEAN */}
-      <HeaderBar
-        totalBase={pedidos.length}
-        usuario={usuario}
-        onImportarClick={() => fileRef.current?.click()}
-        onExportarBase={exportarBase}
+      {/* Barra Lateral Global Estilo "Icon Rail" (Collapsed w-16 + Hover w-64 + Pin) */}
+      <AdminSidebar
+        telaAtual={telaAtual}
+        onSelectTela={(tela) => setTelaAtual(tela)}
         onExportarHistorico={exportarHistorico}
-        onLimparBase={onLimparBase}
-        onOpenAdmin={() => setSheetAdminAberta(true)}
-        importando={importando}
+        isPinned={sidebarPinned}
+        onTogglePin={toggleSidebarPin}
       />
+
+      {/* Área de Conteúdo da Rota Ativa */}
+      <div
+        className={cn(
+          "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out",
+          sidebarPinned ? "pl-64" : "pl-16",
+        )}
+      >
+        {telaAtual === "usuarios" ? (
+          <UsuariosAprovacoesView
+            usuarioIdent={usuario}
+            onVoltarPainel={() => setTelaAtual("painel")}
+            onNavigate={(tela) => setTelaAtual(tela)}
+          />
+        ) : telaAtual === "aging" ? (
+          <AgingBacklogView
+            pedidos={pedidos}
+            usuario={usuario}
+            onVoltarPainel={() => setTelaAtual("painel")}
+            onNavigate={(tela) => setTelaAtual(tela)}
+            onChangeField={alterarCampo}
+          />
+        ) : (
+          <main className="min-h-screen w-full bg-dashboard px-4 pb-16 pt-7 sm:px-6">
+            {/* Input de arquivo oculto */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onImportar(f);
+              }}
+            />
+
+            {/* Modal de Erro Detalhado (Importação) */}
+            <AlertDialog open={!!importError} onOpenChange={(open) => !open && setImportError(null)}>
+              <AlertDialogContent className="rounded-2xl border-rose-200 bg-white p-6 shadow-xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-lg font-bold text-rose-600">
+                    <AlertTriangle className="size-5" />
+                    Falha na Importação
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm text-slate-600">
+                    Ocorreu um erro ao processar a planilha. Por favor, verifique a mensagem abaixo.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div className="my-2 max-h-48 overflow-y-auto rounded-lg bg-rose-50 p-3 text-xs font-mono text-rose-800 border border-rose-100">
+                  {importError}
+                </div>
+
+                <AlertDialogFooter className="sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(importError || "");
+                      toast.success("Detalhes copiados para a área de transferência!");
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition"
+                  >
+                    <Copy className="size-3.5" /> Copiar detalhes
+                  </button>
+                  <AlertDialogAction className="bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-6">
+                    Fechar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* 1. CABEÇALHO CLEAN */}
+            <HeaderBar
+              totalBase={pedidos.length}
+              usuario={usuario}
+              onImportarClick={() => fileRef.current?.click()}
+              onExportarBase={exportarBase}
+              onExportarHistorico={exportarHistorico}
+              onLimparBase={onLimparBase}
+              importando={importando}
+            />
 
       {importando && progressoImportacao && (
         <section
@@ -1013,5 +1006,8 @@ function Painel() {
         </div>
       </div>
     </main>
+    )}
+  </div>
+</div>
   );
 }

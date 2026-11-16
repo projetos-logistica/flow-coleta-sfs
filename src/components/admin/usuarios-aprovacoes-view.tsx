@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { AdminSidebar } from "./admin-sidebar";
 import { NovoUsuarioModal } from "./novo-usuario-modal";
 import { useRbac } from "@/lib/rbac";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,21 +39,9 @@ export function UsuariosAprovacoesView({
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-slate-100 text-slate-800">
-      {/* Sidebar Fixa no desktop */}
-      <AdminSidebar
-        telaAtual="usuarios"
-        onSelectTela={(tela) => {
-          if (tela === "painel") onVoltarPainel();
-          else if (onNavigate) onNavigate(tela);
-        }}
-        className="hidden md:flex shrink-0 border-r border-slate-800/20"
-      />
-
-      {/* Conteúdo Principal */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar do Módulo de Administração */}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 shadow-2xs">
+    <div className="flex flex-col min-w-0 w-full bg-slate-100 text-slate-800">
+      {/* Topbar do Módulo de Administração */}
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 shadow-2xs">
           <div>
             <div className="flex items-center gap-2">
               <button
@@ -297,7 +284,6 @@ export function UsuariosAprovacoesView({
             </div>
           </div>
         </main>
-      </div>
 
       {/* Modal para adicionar novo usuário */}
       <NovoUsuarioModal

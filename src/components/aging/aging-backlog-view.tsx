@@ -1,24 +1,19 @@
 import { useMemo, useRef, useState } from "react";
-import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import {
   Pedido,
   isEscalaNoPrazo,
-  legendaSituacao,
   type EditableField,
 } from "@/lib/coletas";
 import {
+  ArrowDown,
   ArrowLeft,
-  Calendar,
+  ArrowUp,
+  ArrowUpDown,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Download,
   FilterX,
-  Layers,
   MapPin,
-  PanelLeftClose,
-  PanelLeftOpen,
   Search,
   Store,
   Tag,
@@ -33,12 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -51,6 +40,8 @@ export type AgingFaixaKey =
   | "5_6_dias"
   | "7_10_dias"
   | "11_mais";
+
+export type SortColumn = "smart" | "nome" | "total" | AgingFaixaKey;
 
 export const FAIXA_CONFIG: Record<
   AgingFaixaKey,
@@ -66,49 +57,49 @@ export const FAIXA_CONFIG: Record<
   no_prazo: {
     label: "No Prazo",
     sublabel: "Vence hoje, -1, -2d...",
-    bgHeader: "bg-emerald-50/70",
+    bgHeader: "bg-emerald-50/80",
     textHeader: "text-emerald-800",
-    cellActive: "ring-2 ring-emerald-500 bg-emerald-100/60",
+    cellActive: "ring-2 ring-emerald-500 bg-emerald-100/70",
     badgeStyle: "bg-emerald-50 text-emerald-700 border-emerald-200",
   },
   "1_2_dias": {
     label: "1 a 2 dias",
     sublabel: "Atenção suave",
-    bgHeader: "bg-amber-50/70",
+    bgHeader: "bg-amber-50/80",
     textHeader: "text-amber-800",
-    cellActive: "ring-2 ring-amber-500 bg-amber-100/60",
+    cellActive: "ring-2 ring-amber-500 bg-amber-100/70",
     badgeStyle: "bg-amber-50 text-amber-700 border-amber-200",
   },
   "3_4_dias": {
     label: "3 a 4 dias",
     sublabel: "Alerta",
-    bgHeader: "bg-orange-50/70",
+    bgHeader: "bg-orange-50/80",
     textHeader: "text-orange-800",
-    cellActive: "ring-2 ring-orange-500 bg-orange-100/60",
+    cellActive: "ring-2 ring-orange-500 bg-orange-100/70",
     badgeStyle: "bg-orange-50 text-orange-700 border-orange-200",
   },
   "5_6_dias": {
     label: "5 a 6 dias",
     sublabel: "Atraso moderado",
-    bgHeader: "bg-orange-100/70",
+    bgHeader: "bg-orange-100/80",
     textHeader: "text-orange-950 font-semibold",
-    cellActive: "ring-2 ring-orange-600 bg-orange-200/70",
+    cellActive: "ring-2 ring-orange-600 bg-orange-200/80",
     badgeStyle: "bg-orange-100 text-orange-900 border-orange-300 font-semibold",
   },
   "7_10_dias": {
     label: "7 a 10 dias",
     sublabel: "Atraso grave",
-    bgHeader: "bg-rose-50/80",
+    bgHeader: "bg-rose-50/90",
     textHeader: "text-rose-800 font-bold",
-    cellActive: "ring-2 ring-rose-500 bg-rose-100/70",
+    cellActive: "ring-2 ring-rose-500 bg-rose-100/80",
     badgeStyle: "bg-rose-50 text-rose-700 border-rose-300 font-bold",
   },
   "11_mais": {
     label: "11 dias ou mais",
     sublabel: "Crítico",
-    bgHeader: "bg-purple-100/80",
+    bgHeader: "bg-purple-100/90",
     textHeader: "text-purple-950 font-extrabold",
-    cellActive: "ring-2 ring-purple-600 bg-purple-200/80",
+    cellActive: "ring-2 ring-purple-600 bg-purple-200/90",
     badgeStyle: "bg-purple-100 text-purple-950 border-purple-300 font-extrabold",
   },
 };
@@ -156,12 +147,12 @@ interface AgingBacklogViewProps {
 
 export function AgingBacklogView({
   pedidos,
-  usuario,
+  usuario: _usuario,
   onVoltarPainel,
-  onNavigate,
-  onChangeField,
+  onNavigate: _onNavigate,
+  onChangeField: _onChangeField,
 }: AgingBacklogViewProps) {
-  // ─── Filtros Compartilhados (via Contexto) ───
+  // ─── Filtros Compartilhados (via Contexto Global) ───
   const {
     filtroMarca,
     setFiltroMarca,
@@ -174,24 +165,12 @@ export function AgingBacklogView({
     buscaTexto,
     setBuscaTexto,
   } = useFilters();
+
   const [isFocused, setIsFocused] = useState(false);
 
-  // ─── Seleção Interativa de Loja e Faixa (Drill-down) ───
-  const [selectedLoja, setSelectedLoja] = useState<string | null>(null);
-  const [selectedFaixa, setSelectedFaixa] = useState<AgingFaixaKey | null>(null);
-
-  // ─── Paginação da Tabela de Drill-down ───
-  const [pagina, setPagina] = useState(1);
-  const [porPagina, setPorPagina] = useState(25);
-
   // ─── Ordenação da Matriz ───
-  const [ordenarPor, setOrdenarPor] = useState<
-    "smart" | "total" | "nome" | AgingFaixaKey
-  >("smart");
+  const [ordenarPor, setOrdenarPor] = useState<SortColumn>("smart");
   const [ordemDesc, setOrdemDesc] = useState(true);
-
-  // ─── Layout: Matriz Aging retrátil ───
-  const [matrizAberta, setMatrizAberta] = useState(true);
 
   // Refs de busca
   const containerRef = useRef<HTMLDivElement>(null);
@@ -285,48 +264,57 @@ export function AgingBacklogView({
 
     const lista = Array.from(mapa.values());
 
-    // Ordenação da Matriz
+    // Ordenação da Matriz conforme coluna clicada
     lista.sort((a, b) => {
       if (ordenarPor === "smart") {
         // Ordenação inteligente: prioriza 11+ dias, depois 7-10, depois 5-6, 3-4 e total
         if (b.dias_11_mais !== a.dias_11_mais)
-          return b.dias_11_mais - a.dias_11_mais;
-        if (b.dias_7_10 !== a.dias_7_10) return b.dias_7_10 - a.dias_7_10;
-        if (b.dias_5_6 !== a.dias_5_6) return b.dias_5_6 - a.dias_5_6;
-        if (b.dias_3_4 !== a.dias_3_4) return b.dias_3_4 - a.dias_3_4;
-        return b.total - a.total;
-      }
-      if (ordenarPor === "total") {
+          return ordemDesc ? b.dias_11_mais - a.dias_11_mais : a.dias_11_mais - b.dias_11_mais;
+        if (b.dias_7_10 !== a.dias_7_10)
+          return ordemDesc ? b.dias_7_10 - a.dias_7_10 : a.dias_7_10 - b.dias_7_10;
+        if (b.dias_5_6 !== a.dias_5_6)
+          return ordemDesc ? b.dias_5_6 - a.dias_5_6 : a.dias_5_6 - b.dias_5_6;
+        if (b.dias_3_4 !== a.dias_3_4)
+          return ordemDesc ? b.dias_3_4 - a.dias_3_4 : a.dias_3_4 - b.dias_3_4;
         return ordemDesc ? b.total - a.total : a.total - b.total;
       }
+
       if (ordenarPor === "nome") {
         return ordemDesc
-          ? a.nome_loja.localeCompare(b.nome_loja)
-          : b.nome_loja.localeCompare(a.nome_loja);
+          ? b.nome_loja.localeCompare(a.nome_loja)
+          : a.nome_loja.localeCompare(b.nome_loja);
       }
-      if (ordenarPor === "11_mais") {
-        return ordemDesc
-          ? b.dias_11_mais - a.dias_11_mais
-          : a.dias_11_mais - b.dias_11_mais;
+
+      if (ordenarPor === "total") {
+        const diff = b.total - a.total;
+        if (diff !== 0) return ordemDesc ? diff : -diff;
+        return a.nome_loja.localeCompare(b.nome_loja);
       }
-      if (ordenarPor === "7_10_dias") {
-        return ordemDesc
-          ? b.dias_7_10 - a.dias_7_10
-          : a.dias_7_10 - b.dias_7_10;
+
+      // Faixas de envelhecimento específicas
+      const getVal = (r: StoreAgingRow, f: AgingFaixaKey) => {
+        switch (f) {
+          case "no_prazo":
+            return r.no_prazo;
+          case "1_2_dias":
+            return r.dias_1_2;
+          case "3_4_dias":
+            return r.dias_3_4;
+          case "5_6_dias":
+            return r.dias_5_6;
+          case "7_10_dias":
+            return r.dias_7_10;
+          case "11_mais":
+            return r.dias_11_mais;
+        }
+      };
+
+      const valA = getVal(a, ordenarPor);
+      const valB = getVal(b, ordenarPor);
+      if (valA !== valB) {
+        return ordemDesc ? valB - valA : valA - valB;
       }
-      if (ordenarPor === "5_6_dias") {
-        return ordemDesc ? b.dias_5_6 - a.dias_5_6 : a.dias_5_6 - b.dias_5_6;
-      }
-      if (ordenarPor === "3_4_dias") {
-        return ordemDesc ? b.dias_3_4 - a.dias_3_4 : a.dias_3_4 - b.dias_3_4;
-      }
-      if (ordenarPor === "1_2_dias") {
-        return ordemDesc ? b.dias_1_2 - a.dias_1_2 : a.dias_1_2 - b.dias_1_2;
-      }
-      if (ordenarPor === "no_prazo") {
-        return ordemDesc ? b.no_prazo - a.no_prazo : a.no_prazo - b.no_prazo;
-      }
-      return 0;
+      return b.total - a.total;
     });
 
     return lista;
@@ -357,98 +345,15 @@ export function AgingBacklogView({
     );
   }, [matrizLojas]);
 
-  // 4. Lista Detalhada de Pedidos (Drill-down filtrada pela loja / faixa selecionada)
-  const pedidosDrillDown = useMemo(() => {
-    return pendentesFiltrados
-      .filter((p) => {
-        if (selectedLoja && p.nome_loja?.trim() !== selectedLoja.trim())
-          return false;
-        if (selectedFaixa && classificarFaixa(p.escala_coleta) !== selectedFaixa)
-          return false;
-        return true;
-      })
-      .sort((a, b) => {
-        // Ordena por criticidade da escala e depois data
-        const getPesoFaixa = (escala?: string) => {
-          const f = classificarFaixa(escala);
-          switch (f) {
-            case "11_mais":
-              return 6;
-            case "7_10_dias":
-              return 5;
-            case "5_6_dias":
-              return 4;
-            case "3_4_dias":
-              return 3;
-            case "1_2_dias":
-              return 2;
-            case "no_prazo":
-              return 1;
-            default:
-              return 0;
-          }
-        };
-        const pesoA = getPesoFaixa(a.escala_coleta);
-        const pesoB = getPesoFaixa(b.escala_coleta);
-        if (pesoA !== pesoB) return pesoB - pesoA;
-
-        // Desempate por data mais antiga
-        const toIso = (d?: string) => {
-          if (!d) return "9999-99-99";
-          const p = d.split("/");
-          return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d;
-        };
-        return toIso(a.data_pedido).localeCompare(toIso(b.data_pedido));
-      });
-  }, [pendentesFiltrados, selectedLoja, selectedFaixa]);
-
-  // Paginação do Drill-down
-  const totalPaginas = Math.max(1, Math.ceil(pedidosDrillDown.length / porPagina));
-  const paginaAtual = Math.min(pagina, totalPaginas);
-  const paginadosDrillDown = useMemo(() => {
-    return pedidosDrillDown.slice(
-      (paginaAtual - 1) * porPagina,
-      paginaAtual * porPagina,
-    );
-  }, [pedidosDrillDown, paginaAtual, porPagina]);
-
-  // Handlers para Interatividade da Matriz
-  function handleSelectLoja(lojaNome: string) {
-    if (selectedLoja === lojaNome && selectedFaixa === null) {
-      setSelectedLoja(null);
+  // Função para lidar com clique no cabeçalho
+  function handleHeaderSort(col: SortColumn) {
+    if (ordenarPor === col) {
+      setOrdemDesc((prev) => !prev);
     } else {
-      setSelectedLoja(lojaNome);
-      setSelectedFaixa(null);
+      setOrdenarPor(col);
+      // Para nome padrão é A->Z (ASC = false), para contadores numéricos padrão é DESC (true)
+      setOrdemDesc(col === "nome" ? false : true);
     }
-    setPagina(1);
-  }
-
-  function handleSelectCelula(lojaNome: string, faixa: AgingFaixaKey, count: number) {
-    if (count === 0) return;
-    if (selectedLoja === lojaNome && selectedFaixa === faixa) {
-      setSelectedLoja(null);
-      setSelectedFaixa(null);
-    } else {
-      setSelectedLoja(lojaNome);
-      setSelectedFaixa(faixa);
-    }
-    setPagina(1);
-  }
-
-  function handleSelectFaixaGlobal(faixa: AgingFaixaKey) {
-    if (selectedFaixa === faixa && selectedLoja === null) {
-      setSelectedFaixa(null);
-    } else {
-      setSelectedLoja(null);
-      setSelectedFaixa(faixa);
-    }
-    setPagina(1);
-  }
-
-  function limparSelecaoMatriz() {
-    setSelectedLoja(null);
-    setSelectedFaixa(null);
-    setPagina(1);
   }
 
   // Tags Search Handlers
@@ -487,881 +392,697 @@ export function AgingBacklogView({
     setFiltroTransportadora([]);
     setBuscaTags([]);
     setBuscaTexto("");
-    setSelectedLoja(null);
-    setSelectedFaixa(null);
-    setPagina(1);
   }
 
-  // Exportação para Excel
-  function exportarDrillDown() {
-    if (pedidosDrillDown.length === 0) {
-      toast.error("Não há pedidos para exportar.");
+  // Exportação da Matriz Aging para Excel
+  function exportarMatrizExcel() {
+    if (matrizLojas.length === 0) {
+      toast.error("Não há dados na matriz para exportar.");
       return;
     }
-    const linhas = pedidosDrillDown.map((p) => ({
-      "Data do Pedido": p.data_pedido,
-      "Número do Pedido": p.numero_pedido,
-      "Romaneio": p.romaneio ?? "",
-      "Nome da Loja": p.nome_loja,
-      "Transportadora": p.transportadora,
-      "Origem": p.origem,
-      "Marca": p.marca,
-      "UF Destino": p.uf_destino,
-      "Escala Coleta": p.escala_coleta,
-      "Status Coleta": p.status_coleta,
-      "Situação": p.situacao,
+    const linhas = matrizLojas.map((r) => ({
+      Loja: r.nome_loja,
+      "Total Pendente": r.total,
+      "No Prazo": r.no_prazo,
+      "1 a 2 dias": r.dias_1_2,
+      "3 a 4 dias": r.dias_3_4,
+      "5 a 6 dias": r.dias_5_6,
+      "7 a 10 dias": r.dias_7_10,
+      "11 dias ou mais": r.dias_11_mais,
     }));
+
+    // Adiciona linha de total no final
+    linhas.push({
+      Loja: "⚡ TOTAL GERAL",
+      "Total Pendente": totaisGerais.total,
+      "No Prazo": totaisGerais.no_prazo,
+      "1 a 2 dias": totaisGerais.dias_1_2,
+      "3 a 4 dias": totaisGerais.dias_3_4,
+      "5 a 6 dias": totaisGerais.dias_5_6,
+      "7 a 10 dias": totaisGerais.dias_7_10,
+      "11 dias ou mais": totaisGerais.dias_11_mais,
+    });
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), "Aging_Backlog");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), "Matriz_Aging");
     const ts = new Date().toISOString().slice(0, 10);
-    const sulfix = selectedLoja ? `_${selectedLoja.replace(/\s+/g, "_")}` : "";
-    XLSX.writeFile(wb, `Aging_Backlog${sulfix}_${ts}.xlsx`);
-    toast.success("Planilha gerada com sucesso!");
+    XLSX.writeFile(wb, `Matriz_Aging_${ts}.xlsx`);
+    toast.success("Planilha da Matriz Aging exportada com sucesso!");
+  }
+
+  // Ícone de ordenação da coluna
+  function renderSortIndicator(col: SortColumn) {
+    if (ordenarPor === col) {
+      return ordemDesc ? (
+        <ArrowDown className="size-3.5 inline ml-1 text-indigo-600 dark:text-indigo-400 stroke-[2.5]" />
+      ) : (
+        <ArrowUp className="size-3.5 inline ml-1 text-indigo-600 dark:text-indigo-400 stroke-[2.5]" />
+      );
+    }
+    return <ArrowUpDown className="size-3 inline ml-1 text-slate-400 opacity-40 group-hover:opacity-80 transition" />;
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-slate-100 text-slate-800">
-      {/* Sidebar Fixa no desktop */}
-      <AdminSidebar
-        telaAtual="aging"
-        onSelectTela={(tela) => {
-          if (tela === "painel") onVoltarPainel();
-          else onNavigate(tela);
-        }}
-        className="hidden md:flex shrink-0 border-r border-slate-800/20"
-      />
-
-      {/* Área Principal */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar do Painel Aging */}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 shadow-2xs">
-          <div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onVoltarPainel}
-                className="inline-flex md:hidden items-center gap-1 rounded-lg border border-slate-200 p-1.5 text-xs text-slate-600 hover:bg-slate-50 mr-1"
-                title="Voltar ao painel operacional"
-              >
-                <ArrowLeft className="size-4" />
-              </button>
-              <div className="flex items-center gap-2">
-                <Clock className="size-5 text-amber-500" />
-                <h1 className="text-lg font-bold tracking-tight text-slate-900">
-                  Painel de Coletas <span className="font-normal text-slate-400">|</span> Aging de Backlog
-                </h1>
-              </div>
-            </div>
-            <p className="text-xs text-slate-500">
-              Matriz analítica de envelhecimento de pedidos pendentes por loja e escala de coleta
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
+    <div className="flex flex-col min-w-0 w-full bg-slate-100 text-slate-800">
+      {/* Topbar do Painel Aging */}
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4 shadow-2xs">
+        <div>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onVoltarPainel}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+              className="inline-flex md:hidden items-center gap-1 rounded-lg border border-slate-200 p-1.5 text-xs text-slate-600 hover:bg-slate-50 mr-1"
+              title="Voltar ao painel operacional"
             >
-              <ArrowLeft className="size-3.5 text-slate-500" />
-              Painel operacional
+              <ArrowLeft className="size-4" />
             </button>
-
-            <div className="inline-flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200/80 px-3 py-1.5 text-xs font-semibold text-amber-800">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex size-2 rounded-full bg-amber-500"></span>
-              </span>
-              <span>{pendentesFiltrados.length.toLocaleString("pt-BR")} pendentes no backlog</span>
+            <div className="flex items-center gap-2">
+              <Clock className="size-5 text-amber-500" />
+              <h1 className="text-lg font-bold tracking-tight text-slate-900">
+                Painel de Coletas <span className="font-normal text-slate-400">|</span> Aging de Backlog
+              </h1>
             </div>
           </div>
-        </header>
+          <p className="text-xs text-slate-500">
+            Matriz analítica de envelhecimento de pedidos pendentes por loja e escala de coleta
+          </p>
+        </div>
 
-        {/* Conteúdo com Scroll */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-4">
-          {/* 1. BARRA DE BUSCA EM MASSA E FILTROS RÁPIDOS */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              {/* Campo de Busca em Massa com Tags/Chips (Suporte a Excel) */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onVoltarPainel}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+          >
+            <ArrowLeft className="size-3.5 text-slate-500" />
+            Painel operacional
+          </button>
+
+          <div className="inline-flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200/80 px-3 py-1.5 text-xs font-semibold text-amber-800">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex size-2 rounded-full bg-amber-500"></span>
+            </span>
+            <span>{pendentesFiltrados.length.toLocaleString("pt-BR")} pendentes no backlog</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Conteúdo com Scroll */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-4">
+        {/* 1. BARRA DE BUSCA EM MASSA E FILTROS RÁPIDOS */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs space-y-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            {/* Campo de Busca em Massa com Tags/Chips (Suporte a Excel) */}
+            <div
+              ref={containerRef}
+              onClick={() => {
+                setIsFocused(true);
+                inputRef.current?.focus();
+              }}
+              onFocus={() => setIsFocused(true)}
+              onBlur={(e) => {
+                if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+                  setIsFocused(false);
+                }
+              }}
+              className={cn(
+                "relative flex flex-1 items-start gap-2 min-w-0 rounded-xl border bg-slate-50/50 px-3 py-1.5 shadow-2xs transition-all cursor-text",
+                isFocused
+                  ? "border-indigo-500 bg-white ring-2 ring-indigo-500/20"
+                  : "border-slate-200 hover:border-slate-300",
+              )}
+            >
+              <Search className="size-4 shrink-0 text-slate-400 mt-1" />
+
               <div
-                ref={containerRef}
-                onClick={() => {
-                  setIsFocused(true);
-                  inputRef.current?.focus();
-                }}
-                onFocus={() => setIsFocused(true)}
-                onBlur={(e) => {
-                  if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-                    setIsFocused(false);
-                  }
-                }}
                 className={cn(
-                  "relative flex flex-1 items-start gap-2 min-w-0 rounded-xl border bg-slate-50/50 px-3 py-1.5 shadow-2xs transition-all cursor-text",
-                  isFocused
-                    ? "border-indigo-500 bg-white ring-2 ring-indigo-500/20"
-                    : "border-slate-200 hover:border-slate-300",
+                  "flex flex-1 flex-wrap items-center gap-1.5 min-w-0 transition-all duration-200",
+                  isFocused ? "max-h-32 overflow-y-auto pr-1" : "max-h-8 overflow-hidden",
                 )}
               >
-                <Search className="size-4 shrink-0 text-slate-400 mt-1" />
-
-                <div
-                  className={cn(
-                    "flex flex-1 flex-wrap items-center gap-1.5 min-w-0 transition-all duration-200",
-                    isFocused ? "max-h-32 overflow-y-auto pr-1" : "max-h-8 overflow-hidden",
-                  )}
-                >
-                  {tagsVisiveis.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-500/30"
-                    >
-                      <span className="max-w-[140px] truncate">{tag}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removerTag(tag);
-                        }}
-                        className="rounded-full p-0.5 hover:bg-indigo-200/80 text-indigo-600"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-
-                  {isCompact && totalOcultos > 0 && (
-                    <span
+                {tagsVisiveis.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-500/30"
+                  >
+                    <span className="max-w-[140px] truncate">{tag}</span>
+                    <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setIsFocused(true);
-                        inputRef.current?.focus();
+                        removerTag(tag);
                       }}
-                      className="cursor-pointer rounded-md bg-slate-200/80 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-300"
+                      className="rounded-full p-0.5 hover:bg-indigo-200/80 text-indigo-600"
                     >
-                      +{totalOcultos}
-                    </span>
-                  )}
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
 
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={buscaTexto}
-                    onChange={(e) => setBuscaTexto(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === "," || e.key === ";") {
-                        e.preventDefault();
-                        if (buscaTexto.trim()) {
-                          processarTexto(buscaTexto);
-                        }
-                      } else if (
-                        e.key === "Backspace" &&
-                        !buscaTexto &&
-                        buscaTags.length > 0
-                      ) {
-                        removerTag(buscaTags[buscaTags.length - 1]!);
-                      }
-                    }}
-                    onPaste={(e) => {
-                      const pasted = e.clipboardData.getData("text");
-                      if (pasted && /[,\n\r;\s\t]/.test(pasted.trim())) {
-                        e.preventDefault();
-                        processarTexto(pasted);
-                      }
-                    }}
-                    placeholder={
-                      buscaTags.length === 0
-                        ? "Colar lista de pedidos do Excel ou buscar por pedido, loja..."
-                        : "Adicionar mais..."
-                    }
-                    className="flex-1 min-w-[200px] border-none bg-transparent p-0.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                  />
-                </div>
-
-                {(buscaTags.length > 0 || buscaTexto) && (
-                  <button
-                    type="button"
+                {isCompact && totalOcultos > 0 && (
+                  <span
                     onClick={(e) => {
                       e.stopPropagation();
-                      setBuscaTags([]);
-                      setBuscaTexto("");
+                      setIsFocused(true);
+                      inputRef.current?.focus();
                     }}
-                    className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                    title="Limpar busca"
+                    className="cursor-pointer rounded-md bg-slate-200/80 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-300"
                   >
-                    <X className="size-3.5" />
-                  </button>
+                    +{totalOcultos}
+                  </span>
                 )}
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={buscaTexto}
+                  onChange={(e) => setBuscaTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "," || e.key === ";") {
+                      e.preventDefault();
+                      if (buscaTexto.trim()) {
+                        processarTexto(buscaTexto);
+                      }
+                    } else if (
+                      e.key === "Backspace" &&
+                      !buscaTexto &&
+                      buscaTags.length > 0
+                    ) {
+                      removerTag(buscaTags[buscaTags.length - 1]!);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text");
+                    if (pasted && /[,\n\r;\s\t]/.test(pasted.trim())) {
+                      e.preventDefault();
+                      processarTexto(pasted);
+                    }
+                  }}
+                  placeholder={
+                    buscaTags.length === 0
+                      ? "Colar lista de pedidos do Excel ou buscar por pedido, loja..."
+                      : "Adicionar mais..."
+                  }
+                  className="flex-1 min-w-[200px] border-none bg-transparent p-0.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                />
               </div>
 
-              {/* Filtros Rápidos (Marca, Origem, Transportadora) */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Filtro: Marca */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
-                        filtroMarca.length > 0
-                          ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                      )}
-                    >
-                      <Tag className="size-3.5 text-slate-400" />
-                      Marca
-                      {filtroMarca.length > 0 && (
-                        <span className="rounded-full bg-indigo-200/80 px-1.5 py-0.2 text-[10px] font-bold text-indigo-900">
-                          {filtroMarca.length}
-                        </span>
-                      )}
-                      <ChevronDown className="size-3 text-slate-400" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
-                    <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
-                      Filtrar por Marca
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {marcasDisponiveis.map((m) => (
-                      <DropdownMenuCheckboxItem
-                        key={m}
-                        checked={filtroMarca.includes(m)}
-                        onCheckedChange={() =>
-                          setFiltroMarca((prev) =>
-                            prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
-                          )
-                        }
-                        className="text-xs text-slate-700 cursor-pointer"
-                      >
-                        {m}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Filtro: Origem */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
-                        filtroOrigem.length > 0
-                          ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                      )}
-                    >
-                      <MapPin className="size-3.5 text-slate-400" />
-                      Origem
-                      {filtroOrigem.length > 0 && (
-                        <span className="rounded-full bg-indigo-200/80 px-1.5 py-0.2 text-[10px] font-bold text-indigo-900">
-                          {filtroOrigem.length}
-                        </span>
-                      )}
-                      <ChevronDown className="size-3 text-slate-400" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
-                    <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
-                      Filtrar por Origem
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {origensDisponiveis.map((o) => (
-                      <DropdownMenuCheckboxItem
-                        key={o}
-                        checked={filtroOrigem.includes(o)}
-                        onCheckedChange={() =>
-                          setFiltroOrigem((prev) =>
-                            prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o],
-                          )
-                        }
-                        className="text-xs text-slate-700 cursor-pointer"
-                      >
-                        {o}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Filtro: Transportadora */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
-                        filtroTransportadora.length > 0
-                          ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                      )}
-                    >
-                      <Truck className="size-3.5 text-slate-400" />
-                      Transportadora
-                      {filtroTransportadora.length > 0 && (
-                        <span className="rounded-full bg-indigo-200/80 px-1.5 py-0.2 text-[10px] font-bold text-indigo-900">
-                          {filtroTransportadora.length}
-                        </span>
-                      )}
-                      <ChevronDown className="size-3 text-slate-400" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
-                    <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
-                      Filtrar por Transportadora
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {transportadorasDisponiveis.map((t) => (
-                      <DropdownMenuCheckboxItem
-                        key={t}
-                        checked={filtroTransportadora.includes(t)}
-                        onCheckedChange={() =>
-                          setFiltroTransportadora((prev) =>
-                            prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
-                          )
-                        }
-                        className="text-xs text-slate-700 cursor-pointer"
-                      >
-                        {t}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Limpar Todos os Filtros */}
-                {temFiltrosRapidosAtivos && (
-                  <button
-                    type="button"
-                    onClick={limparTodosFiltros}
-                    className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 transition cursor-pointer"
-                  >
-                    <FilterX className="size-3.5" />
-                    Limpar
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 2. LAYOUT SIDE-BY-SIDE: Matriz Aging (esq) + Lista Detalhada (dir) */}
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
-
-            {/* COLUNA ESQUERDA: Matriz Aging (~35%) — retrátil */}
-            {matrizAberta && (
-              <div className="lg:col-span-4 xl:col-span-4 min-w-0">
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  {/* Header Matriz Aging */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-900 px-4 py-3 text-white">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Store className="size-4 text-amber-400 shrink-0" />
-                      <div className="min-w-0">
-                        <h2 className="text-sm font-bold leading-tight">Matriz Aging</h2>
-                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                          Clique na loja ou faixa para filtrar
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-300 shrink-0">
-                        {matrizLojas.length} lojas
-                      </span>
-                    </div>
-                    {/* Botão Recolher Matriz */}
-                    <button
-                      type="button"
-                      onClick={() => setMatrizAberta(false)}
-                      className="inline-flex size-7 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/20 transition shrink-0"
-                      title="Recolher Matriz Aging"
-                    >
-                      <PanelLeftClose className="size-4" />
-                    </button>
-                  </div>
-
-                  {/* Botões de Ordenação */}
-                  <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 text-xs border-b border-slate-700">
-                    <span className="text-slate-400 text-[10px]">Ordenar:</span>
-                    <button
-                      type="button"
-                      onClick={() => { setOrdenarPor("smart"); setOrdemDesc(true); }}
-                      className={cn(
-                        "rounded-md px-2 py-0.5 text-[10px] font-semibold transition cursor-pointer",
-                        ordenarPor === "smart"
-                          ? "bg-amber-400 text-slate-950 font-bold"
-                          : "bg-white/10 text-slate-300 hover:bg-white/20",
-                      )}
-                    >
-                      ⚡ Criticidade
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setOrdenarPor("total"); setOrdemDesc(!ordemDesc); }}
-                      className={cn(
-                        "rounded-md px-2 py-0.5 text-[10px] font-semibold transition cursor-pointer",
-                        ordenarPor === "total"
-                          ? "bg-amber-400 text-slate-950 font-bold"
-                          : "bg-white/10 text-slate-300 hover:bg-white/20",
-                      )}
-                    >
-                      📦 Volume
-                    </button>
-                  </div>
-
-                  {/* Tabela Matriz */}
-                  <div className="max-h-[calc(100vh-320px)] overflow-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-2xs">
-                        <tr>
-                          <th className="py-2.5 px-3 font-bold bg-slate-100 min-w-[140px]">Loja</th>
-                          <th className="py-2.5 px-2 font-bold text-center bg-slate-200/60 min-w-[55px]">Total</th>
-                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[55px]", FAIXA_CONFIG.no_prazo.bgHeader, FAIXA_CONFIG.no_prazo.textHeader)}>
-                            OK
-                          </th>
-                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[45px]", FAIXA_CONFIG["1_2_dias"].bgHeader, FAIXA_CONFIG["1_2_dias"].textHeader)}>
-                            1-2d
-                          </th>
-                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[45px]", FAIXA_CONFIG["3_4_dias"].bgHeader, FAIXA_CONFIG["3_4_dias"].textHeader)}>
-                            3-4d
-                          </th>
-                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[45px]", FAIXA_CONFIG["5_6_dias"].bgHeader, FAIXA_CONFIG["5_6_dias"].textHeader)}>
-                            5-6d
-                          </th>
-                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[50px]", FAIXA_CONFIG["7_10_dias"].bgHeader, FAIXA_CONFIG["7_10_dias"].textHeader)}>
-                            7-10d
-                          </th>
-                          <th className={cn("py-2.5 px-2 font-bold text-center min-w-[50px]", FAIXA_CONFIG["11_mais"].bgHeader, FAIXA_CONFIG["11_mais"].textHeader)}>
-                            11d+
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {/* Linha de Totais Gerais */}
-                        <tr className="bg-slate-50 font-bold border-b-2 border-slate-200 text-slate-900 sticky top-10 z-10">
-                          <td className="py-2 px-3 uppercase text-[10px] tracking-wider text-slate-700 bg-slate-100">
-                            ⚡ TOTAL
-                          </td>
-                          <td className="py-2 px-2 text-center tabular-nums text-xs bg-slate-200/80">
-                            {totaisGerais.total.toLocaleString("pt-BR")}
-                          </td>
-                          <td
-                            onClick={() => handleSelectFaixaGlobal("no_prazo")}
-                            className={cn(
-                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-emerald-100",
-                              selectedFaixa === "no_prazo" && selectedLoja === null ? FAIXA_CONFIG.no_prazo.cellActive : "",
-                            )}
-                          >
-                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-emerald-800 bg-emerald-100/70">
-                              {totaisGerais.no_prazo.toLocaleString("pt-BR")}
-                            </span>
-                          </td>
-                          <td
-                            onClick={() => handleSelectFaixaGlobal("1_2_dias")}
-                            className={cn(
-                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-amber-100",
-                              selectedFaixa === "1_2_dias" && selectedLoja === null ? FAIXA_CONFIG["1_2_dias"].cellActive : "",
-                            )}
-                          >
-                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-amber-800 bg-amber-100/70">
-                              {totaisGerais.dias_1_2.toLocaleString("pt-BR")}
-                            </span>
-                          </td>
-                          <td
-                            onClick={() => handleSelectFaixaGlobal("3_4_dias")}
-                            className={cn(
-                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-orange-100",
-                              selectedFaixa === "3_4_dias" && selectedLoja === null ? FAIXA_CONFIG["3_4_dias"].cellActive : "",
-                            )}
-                          >
-                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-orange-800 bg-orange-100/70">
-                              {totaisGerais.dias_3_4.toLocaleString("pt-BR")}
-                            </span>
-                          </td>
-                          <td
-                            onClick={() => handleSelectFaixaGlobal("5_6_dias")}
-                            className={cn(
-                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-orange-200",
-                              selectedFaixa === "5_6_dias" && selectedLoja === null ? FAIXA_CONFIG["5_6_dias"].cellActive : "",
-                            )}
-                          >
-                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-orange-950 font-bold bg-orange-200/70">
-                              {totaisGerais.dias_5_6.toLocaleString("pt-BR")}
-                            </span>
-                          </td>
-                          <td
-                            onClick={() => handleSelectFaixaGlobal("7_10_dias")}
-                            className={cn(
-                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-rose-100",
-                              selectedFaixa === "7_10_dias" && selectedLoja === null ? FAIXA_CONFIG["7_10_dias"].cellActive : "",
-                            )}
-                          >
-                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-rose-800 font-bold bg-rose-100/80">
-                              {totaisGerais.dias_7_10.toLocaleString("pt-BR")}
-                            </span>
-                          </td>
-                          <td
-                            onClick={() => handleSelectFaixaGlobal("11_mais")}
-                            className={cn(
-                              "py-2 px-2 text-center tabular-nums cursor-pointer transition hover:bg-purple-200",
-                              selectedFaixa === "11_mais" && selectedLoja === null ? FAIXA_CONFIG["11_mais"].cellActive : "",
-                            )}
-                          >
-                            <span className="inline-block rounded px-1.5 py-0.5 text-[10px] text-purple-950 font-extrabold bg-purple-200/90">
-                              {totaisGerais.dias_11_mais.toLocaleString("pt-BR")}
-                            </span>
-                          </td>
-                        </tr>
-
-                        {/* Linhas de Cada Loja */}
-                        {matrizLojas.map((row) => {
-                          const isLojaSelected = selectedLoja === row.nome_loja;
-
-                          return (
-                            <tr
-                              key={row.nome_loja}
-                              className={cn(
-                                "transition-colors hover:bg-slate-50",
-                                isLojaSelected && "bg-indigo-50/40",
-                              )}
-                            >
-                              <td
-                                onClick={() => handleSelectLoja(row.nome_loja)}
-                                className="py-2 px-3 font-semibold text-slate-800 cursor-pointer hover:text-indigo-600 transition text-xs"
-                                title="Clique para filtrar apenas esta loja"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span className="truncate max-w-[120px]">{row.nome_loja}</span>
-                                  {isLojaSelected && selectedFaixa === null && (
-                                    <span className="rounded-full bg-indigo-600 px-1 py-0.2 text-[8px] font-bold text-white shrink-0">✓</span>
-                                  )}
-                                </div>
-                              </td>
-
-                              <td
-                                onClick={() => handleSelectLoja(row.nome_loja)}
-                                className="py-2 px-2 text-center tabular-nums font-bold text-slate-900 cursor-pointer hover:bg-slate-100 text-xs"
-                              >
-                                {row.total.toLocaleString("pt-BR")}
-                              </td>
-
-                              {/* No Prazo */}
-                              <td
-                                onClick={() => handleSelectCelula(row.nome_loja, "no_prazo", row.no_prazo)}
-                                className={cn(
-                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
-                                  row.no_prazo > 0 ? "hover:bg-emerald-50" : "text-slate-300",
-                                  isLojaSelected && selectedFaixa === "no_prazo" && FAIXA_CONFIG.no_prazo.cellActive,
-                                )}
-                              >
-                                {row.no_prazo > 0 ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100">
-                                    {row.no_prazo.toLocaleString("pt-BR")}
-                                  </span>
-                                ) : "—"}
-                              </td>
-
-                              {/* 1 a 2 dias */}
-                              <td
-                                onClick={() => handleSelectCelula(row.nome_loja, "1_2_dias", row.dias_1_2)}
-                                className={cn(
-                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
-                                  row.dias_1_2 > 0 ? "hover:bg-amber-50" : "text-slate-300",
-                                  isLojaSelected && selectedFaixa === "1_2_dias" && FAIXA_CONFIG["1_2_dias"].cellActive,
-                                )}
-                              >
-                                {row.dias_1_2 > 0 ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200">
-                                    {row.dias_1_2.toLocaleString("pt-BR")}
-                                  </span>
-                                ) : "—"}
-                              </td>
-
-                              {/* 3 a 4 dias */}
-                              <td
-                                onClick={() => handleSelectCelula(row.nome_loja, "3_4_dias", row.dias_3_4)}
-                                className={cn(
-                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
-                                  row.dias_3_4 > 0 ? "hover:bg-orange-50" : "text-slate-300",
-                                  isLojaSelected && selectedFaixa === "3_4_dias" && FAIXA_CONFIG["3_4_dias"].cellActive,
-                                )}
-                              >
-                                {row.dias_3_4 > 0 ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200">
-                                    {row.dias_3_4.toLocaleString("pt-BR")}
-                                  </span>
-                                ) : "—"}
-                              </td>
-
-                              {/* 5 a 6 dias */}
-                              <td
-                                onClick={() => handleSelectCelula(row.nome_loja, "5_6_dias", row.dias_5_6)}
-                                className={cn(
-                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
-                                  row.dias_5_6 > 0 ? "hover:bg-orange-100" : "text-slate-300",
-                                  isLojaSelected && selectedFaixa === "5_6_dias" && FAIXA_CONFIG["5_6_dias"].cellActive,
-                                )}
-                              >
-                                {row.dias_5_6 > 0 ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold text-orange-950 bg-orange-100 border border-orange-300">
-                                    {row.dias_5_6.toLocaleString("pt-BR")}
-                                  </span>
-                                ) : "—"}
-                              </td>
-
-                              {/* 7 a 10 dias */}
-                              <td
-                                onClick={() => handleSelectCelula(row.nome_loja, "7_10_dias", row.dias_7_10)}
-                                className={cn(
-                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
-                                  row.dias_7_10 > 0 ? "hover:bg-rose-50" : "text-slate-300",
-                                  isLojaSelected && selectedFaixa === "7_10_dias" && FAIXA_CONFIG["7_10_dias"].cellActive,
-                                )}
-                              >
-                                {row.dias_7_10 > 0 ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-300">
-                                    {row.dias_7_10.toLocaleString("pt-BR")}
-                                  </span>
-                                ) : "—"}
-                              </td>
-
-                              {/* 11 dias ou mais */}
-                              <td
-                                onClick={() => handleSelectCelula(row.nome_loja, "11_mais", row.dias_11_mais)}
-                                className={cn(
-                                  "py-2 px-2 text-center tabular-nums cursor-pointer transition text-xs",
-                                  row.dias_11_mais > 0 ? "hover:bg-purple-100" : "text-slate-300",
-                                  isLojaSelected && selectedFaixa === "11_mais" && FAIXA_CONFIG["11_mais"].cellActive,
-                                )}
-                              >
-                                {row.dias_11_mais > 0 ? (
-                                  <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
-                                    {row.dias_11_mais.toLocaleString("pt-BR")}
-                                  </span>
-                                ) : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* COLUNA DIREITA: Lista Detalhada (65-70% ou 100% quando retraída) */}
-            <div className={matrizAberta ? "lg:col-span-8 xl:col-span-8 min-w-0" : "lg:col-span-12 min-w-0"}>
-              {/* Botão para reabrir a Matriz quando retraída */}
-              {!matrizAberta && (
+              {(buscaTags.length > 0 || buscaTexto) && (
                 <button
                   type="button"
-                  onClick={() => setMatrizAberta(true)}
-                  className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-xs transition hover:bg-slate-50 hover:text-slate-900"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBuscaTags([]);
+                    setBuscaTexto("");
+                  }}
+                  className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Limpar busca"
                 >
-                  <PanelLeftOpen className="size-3.5 text-indigo-600" />
-                  Matriz Aging
+                  <X className="size-3.5" />
                 </button>
               )}
+            </div>
 
-              {/* 3. LISTA DETALHADA DE PEDIDOS (DRILL-DOWN) */}
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                {/* Header do Drill-down */}
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/80 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Layers className="size-4 text-indigo-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Lista Detalhada de Pedidos
-                    </h3>
-
-                    {selectedLoja || selectedFaixa ? (
-                      <div className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 text-xs text-indigo-900 font-medium">
-                        <span>
-                          Filtrando por:{" "}
-                          {selectedLoja && <strong>{selectedLoja}</strong>}
-                          {selectedLoja && selectedFaixa && " › "}
-                          {selectedFaixa && (
-                            <span className="font-semibold text-indigo-700">
-                              {FAIXA_CONFIG[selectedFaixa].label}
-                            </span>
-                          )}
-                          {" ("}
-                          {pedidosDrillDown.length} pedidos{")"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={limparSelecaoMatriz}
-                          className="rounded-full p-0.5 hover:bg-indigo-200 text-indigo-700 cursor-pointer"
-                          title="Limpar filtro de loja/faixa"
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-500 font-medium">
-                        ({pedidosDrillDown.length.toLocaleString("pt-BR")} pedidos pendentes exibidos)
+            {/* Filtros Rápidos (Marca, Origem, Transportadora) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filtro: Marca */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
+                      filtroMarca.length > 0
+                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                    )}
+                  >
+                    <Tag className="size-3.5 text-slate-400" />
+                    Marca
+                    {filtroMarca.length > 0 && (
+                      <span className="rounded-full bg-indigo-200/80 px-1.5 py-0.2 text-[10px] font-bold text-indigo-900">
+                        {filtroMarca.length}
                       </span>
                     )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={exportarDrillDown}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
+                    <ChevronDown className="size-3 text-slate-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
+                  <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
+                    Filtrar por Marca
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {marcasDisponiveis.map((m) => (
+                    <DropdownMenuCheckboxItem
+                      key={m}
+                      checked={filtroMarca.includes(m)}
+                      onCheckedChange={() =>
+                        setFiltroMarca((prev) =>
+                          prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
+                        )
+                      }
+                      className="text-xs text-slate-700 cursor-pointer"
                     >
-                      <Download className="size-3.5 text-slate-500" />
-                      Exportar (.xlsx)
-                    </button>
-                  </div>
-                </div>
+                      {m}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                {/* Tabela de Pedidos */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-200 bg-slate-50/50 text-slate-600">
-                      <tr>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Data do Pedido</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Número do Pedido</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Romaneio</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Nome da Loja</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Transportadora</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Origem</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Marca</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">UF Destino</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Escala Coleta</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Status Coleta</th>
-                        <th className="py-3 px-4 font-semibold whitespace-nowrap">Situação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {paginadosDrillDown.length === 0 ? (
-                        <tr>
-                          <td colSpan={11} className="py-8 text-center text-xs text-slate-400">
-                            Nenhum pedido encontrado para a seleção atual.
-                          </td>
-                        </tr>
-                      ) : (
-                        paginadosDrillDown.map((p) => {
-                          const faixa = classificarFaixa(p.escala_coleta);
-                          const config = FAIXA_CONFIG[faixa];
-
-                          return (
-                            <tr
-                              key={p.numero_pedido}
-                              className="hover:bg-slate-50/80 transition-colors"
-                            >
-                              <td className="py-3 px-4 text-slate-700 tabular-nums whitespace-nowrap">
-                                {p.data_pedido}
-                              </td>
-                              <td className="py-3 px-4 font-mono font-medium text-slate-900 whitespace-nowrap">
-                                {p.numero_pedido}
-                              </td>
-                              <td className="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">
-                                {p.romaneio ?? "—"}
-                              </td>
-                              <td className="py-3 px-4 font-medium text-slate-800 whitespace-nowrap">
-                                {p.nome_loja}
-                              </td>
-                              <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                                {p.transportadora}
-                              </td>
-                              <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                                {p.origem}
-                              </td>
-                              <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                                {p.marca}
-                              </td>
-                              <td className="py-3 px-4 text-slate-700 font-semibold whitespace-nowrap">
-                                {p.uf_destino}
-                              </td>
-                              <td className="py-3 px-4 whitespace-nowrap">
-                                <span
-                                  className={cn(
-                                    "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] border",
-                                    config.badgeStyle,
-                                  )}
-                                >
-                                  {p.escala_coleta}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 whitespace-nowrap">
-                                <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200">
-                                  {p.status_coleta}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 whitespace-nowrap">
-                                <TooltipProvider delayDuration={300}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 cursor-default">
-                                        {p.situacao}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs text-xs">
-                                      {legendaSituacao(p.situacao) ?? p.situacao}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Paginação da Tabela de Drill-down */}
-                {pedidosDrillDown.length > 0 && (
-                  <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <span>Itens por página:</span>
-                      <select
-                        value={porPagina}
-                        onChange={(e) => {
-                          setPorPagina(Number(e.target.value));
-                          setPagina(1);
-                        }}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none"
-                      >
-                        <option value={10}>10</option>
-                        <option value={25}>25</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
-                      <span>
-                        Exibindo {(paginaAtual - 1) * porPagina + 1} a{" "}
-                        {Math.min(paginaAtual * porPagina, pedidosDrillDown.length)} de{" "}
-                        {pedidosDrillDown.length.toLocaleString("pt-BR")}
+              {/* Filtro: Origem */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
+                      filtroOrigem.length > 0
+                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                    )}
+                  >
+                    <MapPin className="size-3.5 text-slate-400" />
+                    Origem
+                    {filtroOrigem.length > 0 && (
+                      <span className="rounded-full bg-indigo-200/80 px-1.5 py-0.2 text-[10px] font-bold text-indigo-900">
+                        {filtroOrigem.length}
                       </span>
-                    </div>
+                    )}
+                    <ChevronDown className="size-3 text-slate-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
+                  <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
+                    Filtrar por Origem
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {origensDisponiveis.map((o) => (
+                    <DropdownMenuCheckboxItem
+                      key={o}
+                      checked={filtroOrigem.includes(o)}
+                      onCheckedChange={() =>
+                        setFiltroOrigem((prev) =>
+                          prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o],
+                        )
+                      }
+                      className="text-xs text-slate-700 cursor-pointer"
+                    >
+                      {o}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={paginaAtual <= 1}
-                        onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                        className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Página anterior"
-                      >
-                        <ChevronLeft className="size-4" />
-                      </button>
-                      <span className="px-2 font-medium">
-                        Página {paginaAtual} de {totalPaginas}
+              {/* Filtro: Transportadora */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
+                      filtroTransportadora.length > 0
+                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                    )}
+                  >
+                    <Truck className="size-3.5 text-slate-400" />
+                    Transportadora
+                    {filtroTransportadora.length > 0 && (
+                      <span className="rounded-full bg-indigo-200/80 px-1.5 py-0.2 text-[10px] font-bold text-indigo-900">
+                        {filtroTransportadora.length}
                       </span>
-                      <button
-                        type="button"
-                        disabled={paginaAtual >= totalPaginas}
-                        onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                        className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Próxima página"
-                      >
-                        <ChevronRight className="size-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    )}
+                    <ChevronDown className="size-3 text-slate-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
+                  <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
+                    Filtrar por Transportadora
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {transportadorasDisponiveis.map((t) => (
+                    <DropdownMenuCheckboxItem
+                      key={t}
+                      checked={filtroTransportadora.includes(t)}
+                      onCheckedChange={() =>
+                        setFiltroTransportadora((prev) =>
+                          prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+                        )
+                      }
+                      className="text-xs text-slate-700 cursor-pointer"
+                    >
+                      {t}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Limpar Todos os Filtros */}
+              {temFiltrosRapidosAtivos && (
+                <button
+                  type="button"
+                  onClick={limparTodosFiltros}
+                  className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 transition cursor-pointer"
+                >
+                  <FilterX className="size-3.5" />
+                  Limpar
+                </button>
+              )}
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+
+        {/* 2. MATRIZ AGING FULL-WIDTH (100% DA LARGURA) */}
+        <div className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          {/* Header da Matriz Aging */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-900 px-5 py-4 text-white">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                <Store className="size-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold tracking-tight">Matriz Aging</h2>
+                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
+                    {matrizLojas.length} lojas
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Distribuição detalhada de pedidos pendentes por loja e tempo de envelhecimento
+                </p>
+              </div>
+            </div>
+
+            {/* Ações e Ordenação da Matriz */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-1.5 bg-slate-800/90 rounded-xl p-1 border border-slate-700 text-xs">
+                <span className="text-[11px] text-slate-400 pl-2 pr-1 font-medium">Critério:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrdenarPor("smart");
+                    setOrdemDesc(true);
+                  }}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer",
+                    ordenarPor === "smart"
+                      ? "bg-amber-400 text-slate-950 font-bold shadow-xs"
+                      : "text-slate-300 hover:bg-white/10",
+                  )}
+                  title="Ordenar por criticidade (pedidos com 11+ dias primeiro)"
+                >
+                  ⚡ Criticidade (Smart)
+                </button>
+              </div>
+
+              {/* Botão de Exportação para Excel */}
+              <button
+                type="button"
+                onClick={exportarMatrizExcel}
+                className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 text-xs font-semibold text-slate-200 shadow-xs hover:bg-slate-700 hover:text-white transition cursor-pointer"
+                title="Exportar dados da Matriz Aging para planilha Excel"
+              >
+                <Download className="size-3.5 text-amber-400" />
+                <span>Exportar (.xlsx)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dica de interação */}
+          <div className="bg-slate-50 border-b border-slate-200 px-5 py-2 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              💡 Clique nos cabeçalhos das colunas (<strong>Total</strong>, <strong>OK</strong>, <strong>1-2d</strong>, <strong>3-4d</strong>, <strong>5-6d</strong>, <strong>7-10d</strong>, <strong>11d+</strong>) para ordenar de forma crescente ou decrescente.
+            </span>
+            <span className="text-[11px] font-medium text-slate-400">
+              {matrizLojas.length} registros
+            </span>
+          </div>
+
+          {/* Tabela Matriz Full-Width */}
+          <div className="max-h-[calc(100vh-340px)] overflow-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-2xs select-none">
+                <tr>
+                  {/* Coluna Loja */}
+                  <th
+                    onClick={() => handleHeaderSort("nome")}
+                    className="py-3 px-4 font-bold bg-slate-100 min-w-[240px] cursor-pointer hover:bg-slate-200/80 transition group"
+                    title="Clique para ordenar por Loja"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Loja</span>
+                      {renderSortIndicator("nome")}
+                    </div>
+                  </th>
+
+                  {/* Coluna Total */}
+                  <th
+                    onClick={() => handleHeaderSort("total")}
+                    className="py-3 px-3 font-bold text-center bg-slate-200/70 min-w-[110px] cursor-pointer hover:bg-slate-300/80 transition group"
+                    title="Clique para ordenar por Total Pendente"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Total Pendente</span>
+                      {renderSortIndicator("total")}
+                    </div>
+                  </th>
+
+                  {/* Coluna No Prazo (OK) */}
+                  <th
+                    onClick={() => handleHeaderSort("no_prazo")}
+                    className={cn(
+                      "py-3 px-3 font-bold text-center min-w-[105px] cursor-pointer hover:brightness-95 transition group",
+                      FAIXA_CONFIG.no_prazo.bgHeader,
+                      FAIXA_CONFIG.no_prazo.textHeader,
+                    )}
+                    title="Clique para ordenar por pedidos No Prazo"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>No Prazo (OK)</span>
+                      {renderSortIndicator("no_prazo")}
+                    </div>
+                  </th>
+
+                  {/* Coluna 1 a 2 dias */}
+                  <th
+                    onClick={() => handleHeaderSort("1_2_dias")}
+                    className={cn(
+                      "py-3 px-3 font-bold text-center min-w-[100px] cursor-pointer hover:brightness-95 transition group",
+                      FAIXA_CONFIG["1_2_dias"].bgHeader,
+                      FAIXA_CONFIG["1_2_dias"].textHeader,
+                    )}
+                    title="Clique para ordenar por 1 a 2 dias"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>1 a 2 dias</span>
+                      {renderSortIndicator("1_2_dias")}
+                    </div>
+                  </th>
+
+                  {/* Coluna 3 a 4 dias */}
+                  <th
+                    onClick={() => handleHeaderSort("3_4_dias")}
+                    className={cn(
+                      "py-3 px-3 font-bold text-center min-w-[100px] cursor-pointer hover:brightness-95 transition group",
+                      FAIXA_CONFIG["3_4_dias"].bgHeader,
+                      FAIXA_CONFIG["3_4_dias"].textHeader,
+                    )}
+                    title="Clique para ordenar por 3 a 4 dias"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>3 a 4 dias</span>
+                      {renderSortIndicator("3_4_dias")}
+                    </div>
+                  </th>
+
+                  {/* Coluna 5 a 6 dias */}
+                  <th
+                    onClick={() => handleHeaderSort("5_6_dias")}
+                    className={cn(
+                      "py-3 px-3 font-bold text-center min-w-[100px] cursor-pointer hover:brightness-95 transition group",
+                      FAIXA_CONFIG["5_6_dias"].bgHeader,
+                      FAIXA_CONFIG["5_6_dias"].textHeader,
+                    )}
+                    title="Clique para ordenar por 5 a 6 dias"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>5 a 6 dias</span>
+                      {renderSortIndicator("5_6_dias")}
+                    </div>
+                  </th>
+
+                  {/* Coluna 7 a 10 dias */}
+                  <th
+                    onClick={() => handleHeaderSort("7_10_dias")}
+                    className={cn(
+                      "py-3 px-3 font-bold text-center min-w-[105px] cursor-pointer hover:brightness-95 transition group",
+                      FAIXA_CONFIG["7_10_dias"].bgHeader,
+                      FAIXA_CONFIG["7_10_dias"].textHeader,
+                    )}
+                    title="Clique para ordenar por 7 a 10 dias"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>7 a 10 dias</span>
+                      {renderSortIndicator("7_10_dias")}
+                    </div>
+                  </th>
+
+                  {/* Coluna 11 dias ou mais */}
+                  <th
+                    onClick={() => handleHeaderSort("11_mais")}
+                    className={cn(
+                      "py-3 px-3 font-bold text-center min-w-[120px] cursor-pointer hover:brightness-95 transition group",
+                      FAIXA_CONFIG["11_mais"].bgHeader,
+                      FAIXA_CONFIG["11_mais"].textHeader,
+                    )}
+                    title="Clique para ordenar por 11 dias ou mais"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>11 dias ou mais</span>
+                      {renderSortIndicator("11_mais")}
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {/* Linha Consolidada ⚡ TOTAL GERAL (Sempre Fixa no topo, nunca reordenada) */}
+                <tr className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 sticky top-11 z-10 shadow-xs backdrop-blur-xs">
+                  <td className="py-3 px-4 uppercase text-xs tracking-wider text-slate-800 bg-slate-200/90 font-extrabold">
+                    ⚡ TOTAL GERAL CONSOLIDADO
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums text-sm font-extrabold bg-slate-300/80 text-slate-950">
+                    {totaisGerais.total.toLocaleString("pt-BR")}
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-emerald-50/90">
+                    <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300/60">
+                      {totaisGerais.no_prazo.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-amber-50/90">
+                    <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/60">
+                      {totaisGerais.dias_1_2.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-orange-50/90">
+                    <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-orange-800 bg-orange-100/90 border border-orange-300/60">
+                      {totaisGerais.dias_3_4.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-orange-100/90">
+                    <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-orange-950 bg-orange-200/90 border border-orange-400/60">
+                      {totaisGerais.dias_5_6.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-rose-50/90">
+                    <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-rose-800 bg-rose-100/90 border border-rose-300/70">
+                      {totaisGerais.dias_7_10.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-purple-100/90">
+                    <span className="inline-block rounded-md px-3 py-0.5 text-xs font-black text-purple-950 bg-purple-200/90 border border-purple-400/80">
+                      {totaisGerais.dias_11_mais.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
+                </tr>
+
+                {/* Linhas de Cada Loja */}
+                {matrizLojas.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-slate-400 text-sm">
+                      Nenhuma loja encontrada para os filtros aplicados.
+                    </td>
+                  </tr>
+                ) : (
+                  matrizLojas.map((row) => (
+                    <tr
+                      key={row.nome_loja}
+                      className="transition-colors hover:bg-slate-50/90"
+                    >
+                      {/* Nome da Loja */}
+                      <td className="py-3 px-4 font-semibold text-slate-800 text-sm">
+                        <span className="truncate block">{row.nome_loja}</span>
+                      </td>
+
+                      {/* Total */}
+                      <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 bg-slate-50/50 text-sm">
+                        {row.total.toLocaleString("pt-BR")}
+                      </td>
+
+                      {/* No Prazo */}
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {row.no_prazo > 0 ? (
+                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
+                            {row.no_prazo.toLocaleString("pt-BR")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-light">—</span>
+                        )}
+                      </td>
+
+                      {/* 1 a 2 dias */}
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {row.dias_1_2 > 0 ? (
+                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200">
+                            {row.dias_1_2.toLocaleString("pt-BR")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-light">—</span>
+                        )}
+                      </td>
+
+                      {/* 3 a 4 dias */}
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {row.dias_3_4 > 0 ? (
+                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200">
+                            {row.dias_3_4.toLocaleString("pt-BR")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-light">—</span>
+                        )}
+                      </td>
+
+                      {/* 5 a 6 dias */}
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {row.dias_5_6 > 0 ? (
+                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-orange-950 bg-orange-100 border border-orange-300">
+                            {row.dias_5_6.toLocaleString("pt-BR")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-light">—</span>
+                        )}
+                      </td>
+
+                      {/* 7 a 10 dias */}
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {row.dias_7_10 > 0 ? (
+                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300">
+                            {row.dias_7_10.toLocaleString("pt-BR")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-light">—</span>
+                        )}
+                      </td>
+
+                      {/* 11 dias ou mais */}
+                      <td className="py-3 px-3 text-center tabular-nums">
+                        {row.dias_11_mais > 0 ? (
+                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
+                            {row.dias_11_mais.toLocaleString("pt-BR")}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-light">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

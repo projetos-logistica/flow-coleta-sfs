@@ -1,7 +1,5 @@
-import lightLogo from "@/assets/logo-azzas-white.asset.json";
-import darkLogo from "@/assets/logo-azzas-dark.asset.json";
 import { useEffect, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Info, LogOut, PanelLeft, Trash2, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, LogOut, Trash2, Upload } from "lucide-react";
 import { isUserAdmin } from "@/lib/rbac";
 import {
   DropdownMenu,
@@ -29,7 +27,7 @@ type HeaderBarProps = {
   onExportarBase: () => void;
   onExportarHistorico: () => void;
   onLimparBase: () => void;
-  onOpenAdmin: () => void;
+  onOpenAdmin?: () => void;
   importando?: boolean;
 };
 
@@ -74,48 +72,31 @@ export function HeaderBar({
   return (
     <header className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        {/* Esquerda: Botão Menu + Título, Status da Base e Identificação */}
-        <div className="flex items-start gap-3">
-          {/* Botão retrátil de Menu Lateral — canto superior esquerdo */}
-          <button
-            type="button"
-            onClick={onOpenAdmin}
-            className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-            title="Abrir/fechar menu lateral"
-          >
-            <PanelLeft className="size-4 text-indigo-600" />
-          </button>
-
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-3">
-              <img
-                src={darkLogo.url}
-                alt="AZZAS 2154"
-                className="h-7 w-auto shrink-0 dark:hidden"
-              />
-              <img
-                src={lightLogo.url}
-                alt="AZZAS 2154"
-                className="hidden h-7 w-auto shrink-0 dark:block"
-              />
-              <span className="h-6 w-px bg-slate-200" aria-hidden="true" />
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Painel de Coletas <span className="font-normal text-slate-400">—</span> SFS Convencional
-              </h1>
-
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
-                </span>
-                {totalBase} pedido(s) na base compartilhada
-              </div>
+        {/* Esquerda: Título, Status da Base e Identificação */}
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Logo Estilizado AZZAS 2154 (Tipografia elegante à prova de imagem quebrada) */}
+            <div className="flex items-baseline gap-1 select-none pr-1">
+              <span className="text-xl font-black tracking-tight text-slate-900">AZZAS</span>
+              <span className="text-xs font-bold tracking-wider text-indigo-600">2154</span>
             </div>
+            <span className="h-6 w-px bg-slate-200" aria-hidden="true" />
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              Painel de Coletas <span className="font-normal text-slate-400">—</span> SFS Convencional
+            </h1>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span>Operando como:</span>
-              <span className="min-w-0 break-all font-semibold text-slate-700">{usuario}</span>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+              </span>
+              {totalBase} pedido(s) na base compartilhada
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span>Operando como:</span>
+            <span className="min-w-0 break-all font-semibold text-slate-700">{usuario}</span>
           </div>
         </div>
 
