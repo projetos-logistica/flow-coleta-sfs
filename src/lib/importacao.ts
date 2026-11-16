@@ -63,7 +63,10 @@ export async function importarPlanilha(
     marca: findHeader(headers, (n) => n.includes("marca")),
     uf: findHeader(headers, (n) => n.includes("uf")),
     escala: findHeader(headers, (n) => n.includes("escala")),
-    romaneio: findHeader(headers, (n) => n.includes("romaneio")),
+    romaneio: findHeader(
+      headers,
+      (n) => n === "romaneio" || n === "nromaneio" || n.includes("romaneio"),
+    ),
   };
 
   if (!col.numero) {
@@ -89,6 +92,19 @@ export async function importarPlanilha(
     if (!id || vistos.has(id)) continue;
     vistos.add(id);
     const existente = porId.get(id);
+
+    // ─── Extração resiliente da coluna Romaneio (case-insensitive + conversão String) ───
+    const romaneioKey =
+      col.romaneio ||
+      Object.keys(row).find((key) => {
+        const k = key.trim().toLowerCase();
+        return k === "romaneio" || k === "nº romaneio" || k === "no romaneio" || k.includes("romaneio");
+      });
+    const romaneioRaw = romaneioKey && row[romaneioKey] != null && row[romaneioKey] !== ""
+      ? String(row[romaneioKey]).trim()
+      : null;
+    const romaneioValue = romaneioRaw || (existente?.romaneio ?? null);
+
     const base = {
       numero_pedido: id,
       data_pedido: col.data ? formatDate(row[col.data]) : (existente?.data_pedido ?? ""),
@@ -102,9 +118,7 @@ export async function importarPlanilha(
       escala_coleta: col.escala
         ? String(row[col.escala] ?? "").trim()
         : (existente?.escala_coleta ?? ""),
-      romaneio: col.romaneio
-        ? String(row[col.romaneio] ?? "").trim()
-        : (existente?.romaneio ?? ""),
+      romaneio: romaneioValue,
       status_coleta: "Pendente",
       // Preservados na importação; sempre enviados para evitar nulos no upsert em lote.
       status_contato: existente?.status_contato ?? "",
