@@ -200,24 +200,18 @@ export async function importarPlanilha(
   const enviarLote = async (lote: Record<string, unknown>[]): Promise<void> => {
     try {
       await comRetentativas(async () => {
-        // Tenta executar via RPC importar_pedidos_bulk
-        const { error: rpcError } = await supabase
-          .rpc("importar_pedidos_bulk", { p_pedidos: lote as unknown as never })
-          .abortSignal(AbortSignal.timeout(45000));
-        
-        // Se a RPC não falhar, conclui com sucesso
-        if (!rpcError) return;
-
-        // Se a RPC falhar (por exemplo, função RPC antiga no banco que não aceita ou não atualiza
-        // as novas colunas romaneio/uf_origem), realiza fallback via upsert direto na tabela pedidos
-        console.warn("RPC importar_pedidos_bulk falhou, executando fallback via upsert direto:", rpcError.message);
-
-        const { error: upsertError } = await supabase
+        // Realiza o upsert direto na tabela pedidos via PostgREST
+        // garantindo a sobrescrita obrigatória de todas as colunas (inclusive romaneio e uf_origem)
+        // com ignoreDuplicates: false no conflito de numero_pedido.
+        const { error } = await supabase
           .from("pedidos")
-          .upsert(lote as unknown as never, { onConflict: "numero_pedido" })
+          .upsert(lote as unknown as never, {
+            onConflict: "numero_pedido",
+            ignoreDuplicates: false,
+          })
           .abortSignal(AbortSignal.timeout(45000));
 
-        if (upsertError) throw upsertError;
+        if (error) throw error;
       }, {
         tentativas: lote.length > TAMANHO_MIN_LOTE ? 2 : TENTATIVAS_POR_LOTE,
         esperaBase: INTERVALO_RETENTATIVA_MS,
