@@ -61,7 +61,11 @@ export async function importarPlanilha(
     transportadora: findHeader(headers, (n) => n.includes("transportadora")),
     origem: findHeader(headers, (n) => n.includes("origem")),
     marca: findHeader(headers, (n) => n.includes("marca")),
-    uf: findHeader(headers, (n) => n.includes("uf")),
+    uf: findHeader(headers, (n) => n.includes("uf") && !n.includes("filial")),
+    uf_filial: findHeader(
+      headers,
+      (n) => n === "uffilial" || (n.includes("uf") && n.includes("filial")),
+    ),
     escala: findHeader(headers, (n) => n.includes("escala")),
     romaneio: findHeader(
       headers,
@@ -93,17 +97,33 @@ export async function importarPlanilha(
     vistos.add(id);
     const existente = porId.get(id);
 
-    // ─── Extração resiliente da coluna Romaneio (case-insensitive + conversão String) ───
+    // ─── Extração resiliente da coluna Romaneio (case-insensitive + conversão String limpa) ───
     const romaneioKey =
       col.romaneio ||
       Object.keys(row).find((key) => {
         const k = key.trim().toLowerCase();
         return k === "romaneio" || k === "nº romaneio" || k === "no romaneio" || k.includes("romaneio");
       });
-    const romaneioRaw = romaneioKey && row[romaneioKey] != null && row[romaneioKey] !== ""
-      ? String(row[romaneioKey]).trim()
-      : null;
-    const romaneioValue = romaneioRaw || (existente?.romaneio ?? null);
+    const romaneioRawVal = romaneioKey ? row[romaneioKey] : undefined;
+    const romaneioValue =
+      romaneioRawVal != null && String(romaneioRawVal).trim() !== ""
+        ? typeof romaneioRawVal === "number"
+          ? String(Math.trunc(romaneioRawVal))
+          : String(romaneioRawVal).trim()
+        : null;
+
+    // ─── Extração resiliente da coluna UF Filial (como uf_origem, case-insensitive + uppercase) ───
+    const ufFilialKey =
+      col.uf_filial ||
+      Object.keys(row).find((key) => {
+        const k = key.trim().toLowerCase();
+        return k === "uf filial" || k === "uffilial" || (k.includes("uf") && k.includes("filial"));
+      });
+    const ufFilialRawVal = ufFilialKey ? row[ufFilialKey] : undefined;
+    const ufOrigemValue =
+      ufFilialRawVal != null && String(ufFilialRawVal).trim() !== ""
+        ? String(ufFilialRawVal).trim().toUpperCase()
+        : null;
 
     const base = {
       numero_pedido: id,
@@ -113,6 +133,7 @@ export async function importarPlanilha(
         ? String(row[col.transportadora] ?? "")
         : (existente?.transportadora ?? ""),
       origem: col.origem ? String(row[col.origem] ?? "") : (existente?.origem ?? ""),
+      uf_origem: ufOrigemValue,
       marca: col.marca ? String(row[col.marca] ?? "").trim() : (existente?.marca ?? ""),
       uf_destino: col.uf ? String(row[col.uf] ?? "").trim() : (existente?.uf_destino ?? ""),
       escala_coleta: col.escala
@@ -179,12 +200,24 @@ export async function importarPlanilha(
   const enviarLote = async (lote: Record<string, unknown>[]): Promise<void> => {
     try {
       await comRetentativas(async () => {
-        // Se a rede "pendurar" a requisição, desiste em 45s e tenta de novo
-        // em vez de ficar esperando indefinidamente.
-        const { error } = await supabase
+        // Tenta executar via RPC importar_pedidos_bulk
+        const { error: rpcError } = await supabase
           .rpc("importar_pedidos_bulk", { p_pedidos: lote as unknown as never })
           .abortSignal(AbortSignal.timeout(45000));
-        if (error) throw error;
+        
+        // Se a RPC não falhar, conclui com sucesso
+        if (!rpcError) return;
+
+        // Se a RPC falhar (por exemplo, função RPC antiga no banco que não aceita ou não atualiza
+        // as novas colunas romaneio/uf_origem), realiza fallback via upsert direto na tabela pedidos
+        console.warn("RPC importar_pedidos_bulk falhou, executando fallback via upsert direto:", rpcError.message);
+
+        const { error: upsertError } = await supabase
+          .from("pedidos")
+          .upsert(lote as unknown as never, { onConflict: "numero_pedido" })
+          .abortSignal(AbortSignal.timeout(45000));
+
+        if (upsertError) throw upsertError;
       }, {
         tentativas: lote.length > TAMANHO_MIN_LOTE ? 2 : TENTATIVAS_POR_LOTE,
         esperaBase: INTERVALO_RETENTATIVA_MS,

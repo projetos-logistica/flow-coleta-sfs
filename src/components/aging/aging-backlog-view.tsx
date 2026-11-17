@@ -222,7 +222,7 @@ export function AgingBacklogView({
         return false;
 
       if (todosTermos.length > 0) {
-        const conteudo = `${p.numero_pedido} ${p.nome_loja} ${p.transportadora} ${p.marca} ${p.origem} ${p.situacao} ${p.romaneio ?? ""}`.toLowerCase();
+        const conteudo = `${p.numero_pedido} ${p.nome_loja} ${p.transportadora} ${p.marca} ${p.origem} ${p.uf_origem ?? ""} ${p.situacao} ${p.romaneio ?? ""}`.toLowerCase();
         const bateu = todosTermos.some((termo) => conteudo.includes(termo));
         if (!bateu) return false;
       }

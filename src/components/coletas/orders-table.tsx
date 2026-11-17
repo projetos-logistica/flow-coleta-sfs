@@ -27,6 +27,7 @@ const HEADERS = [
   "Nome da Loja",
   "Transportadora",
   "Origem",
+  "UF Origem",
   "Marca",
   "UF Destino",
   "Escala Coleta",
@@ -41,6 +42,7 @@ const HEADERS = [
 
 const HEADER_TOOLTIPS: Record<string, string> = {
   Romaneio: "Número de identificação do romaneio de carga.",
+  "UF Origem": "Estado (UF) da filial/loja de origem do pedido.",
   "Data Importação":
     "Data e hora da última planilha em que este pedido esteve presente.",
   "Data Coleta":
@@ -354,6 +356,7 @@ export function OrdersTable({
                   <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-900">{p.nome_loja}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{p.transportadora}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{ouTraco(p.origem)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-700">{ouTraco(p.uf_origem)}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">{ouTraco(p.marca)}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{ouTraco(p.uf_destino)}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{ouTraco(p.escala_coleta)}</td>

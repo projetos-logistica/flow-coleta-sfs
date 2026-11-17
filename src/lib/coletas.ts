@@ -5,6 +5,7 @@ export type Pedido = {
   nome_loja: string;
   transportadora: string;
   origem: string;
+  uf_origem?: string | null;
   marca: string;
   uf_destino: string;
   escala_coleta: string;
@@ -130,6 +131,7 @@ export const FIELD_LABELS = {
   nome_loja: "Nome da Loja",
   transportadora: "Transportadora",
   origem: "Origem",
+  uf_origem: "UF Origem",
   marca: "Marca",
   uf_destino: "UF Destino",
   escala_coleta: "Escala Coleta",
@@ -145,6 +147,7 @@ export const DISPLAY_ORDER = [
   "nome_loja",
   "transportadora",
   "origem",
+  "uf_origem",
   "marca",
   "uf_destino",
   "escala_coleta",

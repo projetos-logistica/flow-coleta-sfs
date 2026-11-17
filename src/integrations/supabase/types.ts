@@ -59,6 +59,7 @@ export type Database = {
           nome_loja: string
           numero_pedido: string
           romaneio?: string | null
+          uf_origem?: string | null
           origem: string
           situacao: string
           situacao_updated_at: string | null
@@ -82,6 +83,7 @@ export type Database = {
           nome_loja?: string
           numero_pedido: string
           romaneio?: string | null
+          uf_origem?: string | null
           origem?: string
           situacao?: string
           situacao_updated_at?: string | null
@@ -105,6 +107,7 @@ export type Database = {
           nome_loja?: string
           numero_pedido?: string
           romaneio?: string | null
+          uf_origem?: string | null
           origem?: string
           situacao?: string
           situacao_updated_at?: string | null

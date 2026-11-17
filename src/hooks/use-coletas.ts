@@ -75,7 +75,11 @@ export async function fetchPedidos(): Promise<Pedido[]> {
         .order("numero_pedido", { ascending: true })
         .range(from, from + PAGE - 1);
       if (error) throw error;
-      return (data ?? []) as Pedido[];
+      return (data ?? []).map((row) => ({
+        ...row,
+        romaneio: row.romaneio ?? null,
+        uf_origem: row.uf_origem ?? null,
+      })) as Pedido[];
     });
   // Descobre o total e baixa as páginas em paralelo (4 por vez).
   const { count, error } = await comRetentativas(async () =>

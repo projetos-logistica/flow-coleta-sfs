@@ -317,9 +317,13 @@ function Painel() {
       if (filtroLoja.length > 0 && !filtroLoja.includes(p.nome_loja)) return false;
       if (filtroContato && p.status_contato !== filtroContato) return false;
       if (todosTermos.length > 0) {
-        const hay = DISPLAY_ORDER.map((f) => String(p[f] ?? ""))
-          .join(" ")
-          .toLowerCase() + " " + (p.romaneio ?? "").toLowerCase();
+        const hay = (
+          DISPLAY_ORDER.map((f) => String(p[f] ?? "")).join(" ") +
+          " " +
+          (p.romaneio ?? "") +
+          " " +
+          (p.uf_origem ?? "")
+        ).toLowerCase();
         const bateu = todosTermos.some((t) => hay.includes(t));
         if (!bateu) return false;
       }
