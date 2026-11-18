@@ -97,6 +97,7 @@ function Painel() {
     filtroTransportadora, setFiltroTransportadora,
     filtroEscala, setFiltroEscala,
     filtroLoja, setFiltroLoja,
+    filtroSituacao, setFiltroSituacao,
     buscaTags, setBuscaTags,
     buscaTexto, setBuscaTexto,
     filtroContato, setFiltroContato,
@@ -108,7 +109,6 @@ function Painel() {
     "pendentes" | "atrasados" | "noprazo" | "coletados_hoje" | null
   >(null);
   const [filtroColeta, setFiltroColeta] = useState<string | null>(null);
-  const [filtroSituacao, setFiltroSituacao] = useState<string[]>([]);
 
   // ─── Tabela & Bulk ───
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -490,7 +490,6 @@ function Painel() {
   function limparFiltrosGlobais() {
     limparFiltrosCtx();
     setFiltroKpiCard(null);
-    setFiltroSituacao([]);
     setFiltroColeta(null);
   }
 

@@ -128,6 +128,7 @@ export async function aplicarRegra48hMovimentacao(pedidos: Pedido[], usuario: st
   const limite = Date.now() - 48 * 60 * 60 * 1000;
   const alvos = pedidos.filter(
     (p) =>
+      p.status_coleta === "Pendente" &&
       String(p.situacao ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
         "AG. MOVIMENTACAO" &&
       (p.data_alteracao_situacao || p.situacao_updated_at) &&
@@ -135,19 +136,23 @@ export async function aplicarRegra48hMovimentacao(pedidos: Pedido[], usuario: st
   );
   if (alvos.length === 0) return 0;
   const agora = new Date().toISOString();
-  for (const lote of emLotes(alvos.map((p) => p.numero_pedido), 200)) {
-    const { error } = await supabase
+  for (const lote of emLotes(alvos.map((p) => p.numero_pedido), 50)) {
+    const { data, error } = await supabase
       .from("pedidos")
       .update({
         situacao: "COBRAR MOVIMENTAÇÃO",
+        editado_por: "Automação (48h)",
         situacao_updated_at: agora,
         data_alteracao_situacao: agora,
       })
-      .in("numero_pedido", lote);
-    if (error) throw error;
+      .in("numero_pedido", lote)
+      .select("numero_pedido");
+    if (error) {
+      console.error("Erro na automação 48h de movimentação:", error);
+    }
   }
   await registrarHistorico(
-    usuario,
+    "Automação (48h)",
     alvos.map((p) => ({
       numero_pedido: p.numero_pedido,
       campo: FIELD_LABELS.situacao,
@@ -229,6 +234,9 @@ export function usePedidos(usuario: string) {
       value,
       onProgress,
     }: AplicarStatusInput): Promise<AplicarStatusResultado> => {
+      // Cancela queries em andamento para evitar race conditions no cache durante updates em lote
+      await queryClient.cancelQueries({ queryKey: PEDIDOS_KEY });
+
       const alvos = pedidos.filter((p) => p[field] !== value);
       if (alvos.length === 0) {
         return { total: 0, sucessos: [], falhas: [] };
@@ -241,8 +249,9 @@ export function usePedidos(usuario: string) {
         patch.data_coleta = value === "Coletado" ? agora : null;
       }
       if (field === "situacao") {
-        patch.situacao_updated_at = new Date().toISOString();
-        patch.data_alteracao_situacao = new Date().toISOString();
+        const agora = new Date().toISOString();
+        patch.situacao_updated_at = agora;
+        patch.data_alteracao_situacao = agora;
       }
 
       // Fracionamento obrigatório em blocos de até 50 pedidos (evita estouro de PostgREST URL e timeout de rede)
@@ -262,14 +271,19 @@ export function usePedidos(usuario: string) {
 
         for (let tentativa = 1; tentativa <= 3; tentativa++) {
           try {
-            const { error } = await supabase
+            const { data, error } = await supabase
               .from("pedidos")
               .update(patch)
               .in(
                 "numero_pedido",
                 lote.map((p) => p.numero_pedido),
-              );
+              )
+              .select("numero_pedido");
+
             if (error) throw error;
+            if (!data || data.length === 0) {
+              throw new Error("Nenhum pedido foi atualizado pelo banco de dados.");
+            }
             loteSalvo = true;
             break;
           } catch (err) {

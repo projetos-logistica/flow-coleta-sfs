@@ -144,7 +144,9 @@ export async function importarPlanilha(
       // Preservados na importação; sempre enviados para evitar nulos no upsert em lote.
       status_contato: existente?.status_contato ?? "",
       situacao: existente?.situacao ?? "AGUARDANDO",
-      situacao_updated_at: existente?.situacao_updated_at ?? null,
+      situacao_updated_at: existente?.situacao_updated_at ?? (existente ? null : importadoEm),
+      data_alteracao_situacao: existente?.data_alteracao_situacao ?? (existente ? null : importadoEm),
+      editado_por: existente?.editado_por ?? "",
       coletado_at: null,
       data_coleta: null,
       importado_at: importadoEm,

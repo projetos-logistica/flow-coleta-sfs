@@ -9,6 +9,7 @@ interface FiltersState {
   filtroTransportadora: string[];
   filtroEscala: string[];
   filtroLoja: string[];
+  filtroSituacao: string[];
 
   // Busca em massa e contato (compartilhados entre painel e aging)
   buscaTags: string[];
@@ -23,6 +24,7 @@ interface FiltersState {
   setFiltroTransportadora: React.Dispatch<React.SetStateAction<string[]>>;
   setFiltroEscala: React.Dispatch<React.SetStateAction<string[]>>;
   setFiltroLoja: React.Dispatch<React.SetStateAction<string[]>>;
+  setFiltroSituacao: React.Dispatch<React.SetStateAction<string[]>>;
   setBuscaTags: React.Dispatch<React.SetStateAction<string[]>>;
   setBuscaTexto: (v: string) => void;
   setFiltroContato: (v: string) => void;
@@ -40,6 +42,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const [filtroTransportadora, setFiltroTransportadora] = useState<string[]>([]);
   const [filtroEscala, setFiltroEscala] = useState<string[]>([]);
   const [filtroLoja, setFiltroLoja] = useState<string[]>([]);
+  const [filtroSituacao, setFiltroSituacao] = useState<string[]>([]);
   const [buscaTags, setBuscaTags] = useState<string[]>([]);
   const [buscaTexto, setBuscaTexto] = useState("");
   const [filtroContato, setFiltroContato] = useState("");
@@ -52,6 +55,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
     setFiltroTransportadora([]);
     setFiltroEscala([]);
     setFiltroLoja([]);
+    setFiltroSituacao([]);
     setBuscaTags([]);
     setBuscaTexto("");
     setFiltroContato("");
@@ -67,6 +71,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         filtroTransportadora,
         filtroEscala,
         filtroLoja,
+        filtroSituacao,
         buscaTags,
         buscaTexto,
         filtroContato,
@@ -77,6 +82,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         setFiltroTransportadora,
         setFiltroEscala,
         setFiltroLoja,
+        setFiltroSituacao,
         setBuscaTags,
         setBuscaTexto,
         setFiltroContato,

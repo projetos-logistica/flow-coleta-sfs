@@ -3,6 +3,9 @@ import {
   Pedido,
   isEscalaNoPrazo,
   type EditableField,
+  SITUACAO_OPTIONS,
+  DISPLAY_ORDER,
+  FIELD_LABELS,
 } from "@/lib/coletas";
 import {
   ArrowDown,
@@ -13,6 +16,7 @@ import {
   Clock,
   Download,
   FilterX,
+  Layers,
   MapPin,
   Search,
   Store,
@@ -160,6 +164,8 @@ export function AgingBacklogView({
     setFiltroOrigem,
     filtroTransportadora,
     setFiltroTransportadora,
+    filtroSituacao,
+    setFiltroSituacao,
     buscaTags,
     setBuscaTags,
     buscaTexto,
@@ -167,6 +173,7 @@ export function AgingBacklogView({
   } = useFilters();
 
   const [isFocused, setIsFocused] = useState(false);
+  const [lojaSelecionada, setLojaSelecionada] = useState<string | null>(null);
 
   // ─── Ordenação da Matriz ───
   const [ordenarPor, setOrdenarPor] = useState<SortColumn>("smart");
@@ -196,6 +203,9 @@ export function AgingBacklogView({
       [...new Set(pedidosPendentes.map((p) => p.transportadora).filter(Boolean))].sort(),
     [pedidosPendentes],
   );
+  const situacoesDisponiveis = useMemo(() => {
+    return Array.from(SITUACAO_OPTIONS);
+  }, []);
 
   // 2. Aplicação dos filtros rápidos sobre os pendentes
   const pendentesFiltrados = useMemo(() => {
@@ -220,6 +230,8 @@ export function AgingBacklogView({
         !filtroTransportadora.includes(p.transportadora)
       )
         return false;
+      if (filtroSituacao.length > 0 && !filtroSituacao.includes(p.situacao))
+        return false;
 
       if (todosTermos.length > 0) {
         const conteudo = `${p.numero_pedido} ${p.nome_loja} ${p.transportadora} ${p.marca} ${p.origem} ${p.uf_origem ?? ""} ${p.situacao} ${p.romaneio ?? ""}`.toLowerCase();
@@ -229,7 +241,7 @@ export function AgingBacklogView({
 
       return true;
     });
-  }, [pedidosPendentes, filtroMarca, filtroOrigem, filtroTransportadora, buscaTags, buscaTexto]);
+  }, [pedidosPendentes, filtroMarca, filtroOrigem, filtroTransportadora, filtroSituacao, buscaTags, buscaTexto]);
 
   // 3. Construção da Matriz de Envelhecimento por Loja
   const matrizLojas = useMemo(() => {
@@ -390,6 +402,7 @@ export function AgingBacklogView({
     filtroMarca.length > 0 ||
     filtroOrigem.length > 0 ||
     filtroTransportadora.length > 0 ||
+    filtroSituacao.length > 0 ||
     buscaTags.length > 0 ||
     !!buscaTexto;
 
@@ -397,44 +410,66 @@ export function AgingBacklogView({
     setFiltroMarca([]);
     setFiltroOrigem([]);
     setFiltroTransportadora([]);
+    setFiltroSituacao([]);
     setBuscaTags([]);
     setBuscaTexto("");
+    setLojaSelecionada(null);
   }
 
-  // Exportação da Matriz Aging para Excel
+  // Exportação da Matriz Aging para Excel (Formato Analítico Detalhado de Pedidos)
   function exportarMatrizExcel() {
-    if (matrizLojas.length === 0) {
-      toast.error("Não há dados na matriz para exportar.");
+    const pedidosParaExportar = lojaSelecionada
+      ? pendentesFiltrados.filter(
+          (p) => (p.nome_loja?.trim() || "NÃO INFORMADA") === lojaSelecionada,
+        )
+      : pendentesFiltrados;
+
+    if (pedidosParaExportar.length === 0) {
+      toast.error("Não há pedidos pendentes para exportar.");
       return;
     }
-    const linhas = matrizLojas.map((r) => ({
-      Loja: r.nome_loja,
-      "Total Pendente": r.total,
-      "No Prazo": r.no_prazo,
-      "1 a 2 dias": r.dias_1_2,
-      "3 a 4 dias": r.dias_3_4,
-      "5 a 6 dias": r.dias_5_6,
-      "7 a 10 dias": r.dias_7_10,
-      "11 dias ou mais": r.dias_11_mais,
-    }));
 
-    // Adiciona linha de total no final
-    linhas.push({
-      Loja: "⚡ TOTAL GERAL",
-      "Total Pendente": totaisGerais.total,
-      "No Prazo": totaisGerais.no_prazo,
-      "1 a 2 dias": totaisGerais.dias_1_2,
-      "3 a 4 dias": totaisGerais.dias_3_4,
-      "5 a 6 dias": totaisGerais.dias_5_6,
-      "7 a 10 dias": totaisGerais.dias_7_10,
-      "11 dias ou mais": totaisGerais.dias_11_mais,
+    const linhas = pedidosParaExportar.map((p) => {
+      const row: Record<string, string> = {};
+      DISPLAY_ORDER.forEach((f) => (row[FIELD_LABELS[f]] = String(p[f] ?? "")));
+      row["Data Coleta"] = p.coletado_at
+        ? new Date(p.coletado_at).toLocaleString("pt-BR")
+        : "";
+      row["Data Importação"] = p.importado_at
+        ? new Date(p.importado_at).toLocaleString("pt-BR")
+        : "";
+      row["Importado por"] = p.importado_por ?? "";
+      row["Editado por"] = p.editado_por ?? "";
+      row["Primeira Importação"] = p.created_at
+        ? new Date(p.created_at).toLocaleString("pt-BR")
+        : "";
+      row["Data Alteração Situação"] = (p.data_alteracao_situacao || p.situacao_updated_at)
+        ? new Date(p.data_alteracao_situacao || p.situacao_updated_at || "").toLocaleString("pt-BR")
+        : "";
+
+      return row;
     });
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), "Matriz_Aging");
-    const ts = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `Matriz_Aging_${ts}.xlsx`);
-    toast.success("Planilha da Matriz Aging exportada com sucesso!");
+    const nomeAba = lojaSelecionada
+      ? `Pedidos_${lojaSelecionada.slice(0, 20).replace(/[/\\?*[\]]/g, "_")}`
+      : "Pedidos_Pendentes";
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), nomeAba);
+
+    const now = new Date();
+    const ts =
+      now.toISOString().slice(0, 10) +
+      "_" +
+      now.getHours().toString().padStart(2, "0") +
+      "h" +
+      now.getMinutes().toString().padStart(2, "0");
+    const sufixoLoja = lojaSelecionada
+      ? `_${lojaSelecionada.replace(/[^a-zA-Z0-9_-]/g, "_")}`
+      : "";
+    XLSX.writeFile(wb, `Aging_Pedidos_Pendentes${sufixoLoja}_${ts}.xlsx`);
+    toast.success(
+      `${linhas.length} pedido(s) analítico(s) exportado(s) com sucesso!`,
+    );
   }
 
   // Ícone de ordenação da coluna
@@ -644,6 +679,7 @@ export function AgingBacklogView({
                     <DropdownMenuCheckboxItem
                       key={m}
                       checked={filtroMarca.includes(m)}
+                      onSelect={(e) => e.preventDefault()}
                       onCheckedChange={() =>
                         setFiltroMarca((prev) =>
                           prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
@@ -688,6 +724,7 @@ export function AgingBacklogView({
                     <DropdownMenuCheckboxItem
                       key={o}
                       checked={filtroOrigem.includes(o)}
+                      onSelect={(e) => e.preventDefault()}
                       onCheckedChange={() =>
                         setFiltroOrigem((prev) =>
                           prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o],
@@ -732,6 +769,7 @@ export function AgingBacklogView({
                     <DropdownMenuCheckboxItem
                       key={t}
                       checked={filtroTransportadora.includes(t)}
+                      onSelect={(e) => e.preventDefault()}
                       onCheckedChange={() =>
                         setFiltroTransportadora((prev) =>
                           prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
@@ -740,6 +778,51 @@ export function AgingBacklogView({
                       className="text-xs text-slate-700 cursor-pointer"
                     >
                       {t}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Filtro: Situação */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition cursor-pointer",
+                      filtroSituacao.length > 0
+                        ? "border-amber-200 bg-amber-50 text-amber-800 font-semibold"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                    )}
+                  >
+                    <Layers className="size-3.5 text-slate-400" />
+                    Situação
+                    {filtroSituacao.length > 0 && (
+                      <span className="rounded-full bg-amber-200/90 px-1.5 py-0.2 text-[10px] font-bold text-amber-950">
+                        {filtroSituacao.length}
+                      </span>
+                    )}
+                    <ChevronDown className="size-3 text-slate-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 max-h-64 overflow-y-auto bg-white border border-slate-200 p-1 shadow-lg rounded-xl">
+                  <DropdownMenuLabel className="text-xs text-slate-500 font-bold px-2 py-1">
+                    Filtrar por Situação
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {situacoesDisponiveis.map((s) => (
+                    <DropdownMenuCheckboxItem
+                      key={s}
+                      checked={filtroSituacao.includes(s)}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={() =>
+                        setFiltroSituacao((prev) =>
+                          prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
+                        )
+                      }
+                      className="text-xs text-slate-700 cursor-pointer"
+                    >
+                      {s}
                     </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
@@ -774,6 +857,22 @@ export function AgingBacklogView({
                   <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
                     {matrizLojas.length} lojas
                   </span>
+                  {lojaSelecionada && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-400/40 px-3 py-0.5 text-xs font-bold text-amber-300">
+                      Loja Selecionada: {lojaSelecionada}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLojaSelecionada(null);
+                        }}
+                        className="rounded-full hover:bg-white/20 p-0.5 cursor-pointer"
+                        title="Limpar seleção de loja"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Distribuição detalhada de pedidos pendentes por loja e tempo de envelhecimento
@@ -1011,88 +1110,110 @@ export function AgingBacklogView({
                     </td>
                   </tr>
                 ) : (
-                  matrizLojas.map((row) => (
-                    <tr
-                      key={row.nome_loja}
-                      className="transition-colors hover:bg-slate-50/90"
-                    >
-                      {/* Nome da Loja */}
-                      <td className="py-3 px-4 font-semibold text-slate-800 text-sm">
-                        <span className="truncate block">{row.nome_loja}</span>
-                      </td>
-
-                      {/* Total */}
-                      <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 bg-slate-50/50 text-sm">
-                        {row.total.toLocaleString("pt-BR")}
-                      </td>
-
-                      {/* No Prazo */}
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {row.no_prazo > 0 ? (
-                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
-                            {row.no_prazo.toLocaleString("pt-BR")}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
+                  matrizLojas.map((row) => {
+                    const isSelected = lojaSelecionada === row.nome_loja;
+                    return (
+                      <tr
+                        key={row.nome_loja}
+                        onClick={() =>
+                          setLojaSelecionada((prev) =>
+                            prev === row.nome_loja ? null : row.nome_loja,
+                          )
+                        }
+                        className={cn(
+                          "transition-colors cursor-pointer select-none",
+                          isSelected
+                            ? "bg-amber-50 hover:bg-amber-100/80 ring-1 ring-inset ring-amber-300"
+                            : "hover:bg-slate-50/90",
                         )}
-                      </td>
+                        title="Clique para selecionar e exportar apenas os pedidos desta loja"
+                      >
+                        {/* Nome da Loja */}
+                        <td className="py-3 px-4 font-semibold text-slate-800 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "size-2 rounded-full transition",
+                                isSelected ? "bg-amber-500 ring-2 ring-amber-200" : "bg-transparent",
+                              )}
+                            />
+                            <span className="truncate block">{row.nome_loja}</span>
+                          </div>
+                        </td>
 
-                      {/* 1 a 2 dias */}
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {row.dias_1_2 > 0 ? (
-                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200">
-                            {row.dias_1_2.toLocaleString("pt-BR")}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
-                        )}
-                      </td>
+                        {/* Total */}
+                        <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-900 bg-slate-50/50 text-sm">
+                          {row.total.toLocaleString("pt-BR")}
+                        </td>
 
-                      {/* 3 a 4 dias */}
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {row.dias_3_4 > 0 ? (
-                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200">
-                            {row.dias_3_4.toLocaleString("pt-BR")}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
-                        )}
-                      </td>
+                        {/* No Prazo */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.no_prazo > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
+                              {row.no_prazo.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
 
-                      {/* 5 a 6 dias */}
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {row.dias_5_6 > 0 ? (
-                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-orange-950 bg-orange-100 border border-orange-300">
-                            {row.dias_5_6.toLocaleString("pt-BR")}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
-                        )}
-                      </td>
+                        {/* 1 a 2 dias */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.dias_1_2 > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200">
+                              {row.dias_1_2.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
 
-                      {/* 7 a 10 dias */}
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {row.dias_7_10 > 0 ? (
-                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300">
-                            {row.dias_7_10.toLocaleString("pt-BR")}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
-                        )}
-                      </td>
+                        {/* 3 a 4 dias */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.dias_3_4 > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200">
+                              {row.dias_3_4.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
 
-                      {/* 11 dias ou mais */}
-                      <td className="py-3 px-3 text-center tabular-nums">
-                        {row.dias_11_mais > 0 ? (
-                          <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
-                            {row.dias_11_mais.toLocaleString("pt-BR")}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 font-light">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                        {/* 5 a 6 dias */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.dias_5_6 > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-orange-950 bg-orange-100 border border-orange-300">
+                              {row.dias_5_6.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
+
+                        {/* 7 a 10 dias */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.dias_7_10 > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300">
+                              {row.dias_7_10.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
+
+                        {/* 11 dias ou mais */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.dias_11_mais > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
+                              {row.dias_11_mais.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
