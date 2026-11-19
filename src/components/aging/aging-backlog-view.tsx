@@ -45,7 +45,7 @@ export type AgingFaixaKey =
   | "7_10_dias"
   | "11_mais";
 
-export type SortColumn = "smart" | "nome" | "total" | AgingFaixaKey;
+export type SortColumn = "smart" | "nome" | "total" | "tratados" | AgingFaixaKey;
 
 export const FAIXA_CONFIG: Record<
   AgingFaixaKey,
@@ -139,6 +139,7 @@ export interface StoreAgingRow {
   dias_5_6: number;
   dias_7_10: number;
   dias_11_mais: number;
+  pedidosTratados: number;
 }
 
 interface AgingBacklogViewProps {
@@ -260,6 +261,7 @@ export function AgingBacklogView({
           dias_5_6: 0,
           dias_7_10: 0,
           dias_11_mais: 0,
+          pedidosTratados: 0,
         };
         mapa.set(nome, row);
       }
@@ -272,6 +274,10 @@ export function AgingBacklogView({
       else if (faixa === "5_6_dias") row.dias_5_6 += 1;
       else if (faixa === "7_10_dias") row.dias_7_10 += 1;
       else if (faixa === "11_mais") row.dias_11_mais += 1;
+
+      if (Boolean(p.situacao) && p.situacao.trim().toUpperCase() !== "AGUARDANDO") {
+        row.pedidosTratados += 1;
+      }
     });
 
     const lista = Array.from(mapa.values());
@@ -299,6 +305,12 @@ export function AgingBacklogView({
 
       if (ordenarPor === "total") {
         const diff = b.total - a.total;
+        if (diff !== 0) return ordemDesc ? diff : -diff;
+        return a.nome_loja.localeCompare(b.nome_loja);
+      }
+
+      if (ordenarPor === "tratados") {
+        const diff = b.pedidosTratados - a.pedidosTratados;
         if (diff !== 0) return ordemDesc ? diff : -diff;
         return a.nome_loja.localeCompare(b.nome_loja);
       }
@@ -343,6 +355,7 @@ export function AgingBacklogView({
         acc.dias_5_6 += r.dias_5_6;
         acc.dias_7_10 += r.dias_7_10;
         acc.dias_11_mais += r.dias_11_mais;
+        acc.pedidosTratados += r.pedidosTratados;
         return acc;
       },
       {
@@ -353,6 +366,7 @@ export function AgingBacklogView({
         dias_5_6: 0,
         dias_7_10: 0,
         dias_11_mais: 0,
+        pedidosTratados: 0,
       },
     );
   }, [matrizLojas]);
@@ -1058,6 +1072,18 @@ export function AgingBacklogView({
                       {renderSortIndicator("11_mais")}
                     </div>
                   </th>
+
+                  {/* Coluna Pedidos Tratados */}
+                  <th
+                    onClick={() => handleHeaderSort("tratados")}
+                    className="py-3 px-3 font-bold text-center min-w-[130px] cursor-pointer hover:brightness-95 transition group bg-sky-50/80 text-sky-800"
+                    title="Clique para ordenar por Pedidos Tratados"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Pedidos Tratados</span>
+                      {renderSortIndicator("tratados")}
+                    </div>
+                  </th>
                 </tr>
               </thead>
 
@@ -1100,12 +1126,17 @@ export function AgingBacklogView({
                       {totaisGerais.dias_11_mais.toLocaleString("pt-BR")}
                     </span>
                   </td>
+                  <td className="py-3 px-3 text-center tabular-nums bg-sky-50/90">
+                    <span className="inline-block rounded-md px-3 py-0.5 text-xs font-black text-sky-900 bg-sky-100 border border-sky-300">
+                      {totaisGerais.pedidosTratados.toLocaleString("pt-BR")}
+                    </span>
+                  </td>
                 </tr>
 
                 {/* Linhas de Cada Loja */}
                 {matrizLojas.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 text-sm">
+                    <td colSpan={9} className="py-12 text-center text-slate-400 text-sm">
                       Nenhuma loja encontrada para os filtros aplicados.
                     </td>
                   </tr>
@@ -1206,6 +1237,17 @@ export function AgingBacklogView({
                           {row.dias_11_mais > 0 ? (
                             <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-extrabold text-purple-950 bg-purple-100 border border-purple-300">
                               {row.dias_11_mais.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-light">—</span>
+                          )}
+                        </td>
+
+                        {/* Pedidos Tratados */}
+                        <td className="py-3 px-3 text-center tabular-nums">
+                          {row.pedidosTratados > 0 ? (
+                            <span className="inline-block rounded-md px-2.5 py-0.5 text-xs font-bold text-sky-800 bg-sky-100 border border-sky-300">
+                              {row.pedidosTratados.toLocaleString("pt-BR")}
                             </span>
                           ) : (
                             <span className="text-slate-300 font-light">—</span>
