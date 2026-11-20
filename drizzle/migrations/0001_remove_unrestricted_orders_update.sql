@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Permitir update de pedidos para usuarios autenticados" ON public.pedidos;

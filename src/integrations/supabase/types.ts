@@ -58,15 +58,15 @@ export type Database = {
           marca: string
           nome_loja: string
           numero_pedido: string
-          romaneio?: string | null
-          uf_origem?: string | null
           origem: string
+          romaneio: string | null
           situacao: string
           situacao_updated_at: string | null
           status_coleta: string
           status_contato: string
           transportadora: string
           uf_destino: string
+          uf_origem: string | null
           updated_at: string
         }
         Insert: {
@@ -82,15 +82,15 @@ export type Database = {
           marca?: string
           nome_loja?: string
           numero_pedido: string
-          romaneio?: string | null
-          uf_origem?: string | null
           origem?: string
+          romaneio?: string | null
           situacao?: string
           situacao_updated_at?: string | null
           status_coleta?: string
           status_contato?: string
           transportadora?: string
           uf_destino?: string
+          uf_origem?: string | null
           updated_at?: string
         }
         Update: {
@@ -106,15 +106,15 @@ export type Database = {
           marca?: string
           nome_loja?: string
           numero_pedido?: string
-          romaneio?: string | null
-          uf_origem?: string | null
           origem?: string
+          romaneio?: string | null
           situacao?: string
           situacao_updated_at?: string | null
           status_coleta?: string
           status_contato?: string
           transportadora?: string
           uf_destino?: string
+          uf_origem?: string | null
           updated_at?: string
         }
         Relationships: []
