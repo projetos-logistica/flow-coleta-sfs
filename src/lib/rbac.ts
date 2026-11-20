@@ -319,8 +319,7 @@ export function useRbac(currentUserIdent?: string | null) {
 
     const nomeFormatado =
       dados.nome?.trim() ||
-      emailLimpo
-        .split("@")[0]
+      (emailLimpo.split("@")[0] ?? "")
         .split(".")
         .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
         .join(" ");

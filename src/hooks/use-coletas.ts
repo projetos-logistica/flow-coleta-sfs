@@ -260,7 +260,7 @@ export function usePedidos(usuario: string) {
       const falhas: string[] = [];
 
       for (let i = 0; i < lotes.length; i++) {
-        const lote = lotes[i];
+        const lote = lotes[i] ?? [];
         if (onProgress) {
           onProgress(salvosComSucesso.length, alvos.length, i + 1, lotes.length);
         }
@@ -333,6 +333,7 @@ export function usePedidos(usuario: string) {
         avisarAlteracao();
         return queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
       }
+      return undefined;
     },
   });
 
