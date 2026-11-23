@@ -143,7 +143,7 @@ export async function importarPlanilha(
       status_coleta: "Pendente",
       // Preservados na importação; sempre enviados para evitar nulos no upsert em lote.
       status_contato: existente?.status_contato ?? "",
-      situacao: existente?.situacao ?? "AGUARDANDO",
+      situacao: existente?.situacao ?? "AG. TRATATIVA",
       situacao_updated_at: existente?.situacao_updated_at ?? (existente ? null : importadoEm),
       data_alteracao_situacao: existente?.data_alteracao_situacao ?? (existente ? null : importadoEm),
       editado_por: existente?.editado_por ?? "",

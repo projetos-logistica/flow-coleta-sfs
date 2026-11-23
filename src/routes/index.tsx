@@ -406,7 +406,8 @@ function Painel() {
       .filter(
         (p) =>
           p.status_coleta === "Pendente" &&
-          normSituacao(p.situacao) === normSituacao("AGUARDANDO"),
+          (normSituacao(p.situacao) === normSituacao("AG. TRATATIVA") ||
+            normSituacao(p.situacao) === normSituacao("AGUARDANDO")),
       )
       .forEach((p) => {
         const item =

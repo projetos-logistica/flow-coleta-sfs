@@ -38,7 +38,7 @@ export type EventoHistorico = {
 export const COLETA_OPTIONS = ["Pendente", "Coletado"] as const;
 export const CONTATO_OPTIONS = ["Contato Realizado", "Contato Falhou"] as const;
 export const SITUACAO_OPTIONS = [
-  "AGUARDANDO",
+  "AG. TRATATIVA",
   "ERRO SISTÊMICO",
   "PROBLEMA INTEGRAÇÃO",
   "AG. COLETA",
@@ -46,6 +46,10 @@ export const SITUACAO_OPTIONS = [
   "COBRAR MOVIMENTAÇÃO",
   "NÃO LIBERADO PELA LOJA",
   "BAIXO VOLUME",
+  "TRATADO PELO SAC",
+  "EM BUSCA / EXTRAVIO",
+  "FORA DA ABRANGÊNCIA",
+  "ALTO VALOR",
 ] as const;
 
 
@@ -60,8 +64,9 @@ export function normSituacao(v?: string | null): string {
 
 /** Dicionário oficial de legendas exibidas nas tooltips de Situação. */
 export const SITUACAO_LEGENDAS: Record<string, string> = {
+  "AG. TRATATIVA": "Status inicial do pedido pendente de tratativa ou coleta.",
   AGUARDANDO: "Status inicial do pedido pendente de tratativa ou coleta.",
-  "ERRO SISTEMICO": "Pedido com erro ou divergência no processo de faturamento.",
+  "ERRO SISTEMICO": "Pedidos com erro sistêmico.",
   "PROBLEMA INTEGRACAO":
     "Falha de comunicação/integração de dados entre o sistema e a transportadora.",
   "AG. COLETA":
@@ -74,6 +79,12 @@ export const SITUACAO_LEGENDAS: Record<string, string> = {
     "Pedido não entregue à transportadora pela loja no momento da coleta.",
   "BAIXO VOLUME":
     "Coleta não realizada devido ao baixo volume e baixa frequência na rota.",
+  "TRATADO PELO SAC":
+    "Tratativa realizada pelo SAC, porém o pedido está aguardando movimentação física e sistêmica.",
+  "EM BUSCA / EXTRAVIO": "Aguardando retorno do transportador.",
+  "FORA DA ABRANGENCIA": "Pedidos com erro na abrangência de CEP.",
+  "ALTO VALOR":
+    "Pedidos que excedem o limite de valor de ressarcimento da transportadora.",
 };
 
 /** Legenda da situação (aceita valores com ou sem acentuação). */
@@ -157,7 +168,7 @@ export const DISPLAY_ORDER = [
 ] as const;
 
 
-/** Classes de cor semânticas por status (tokens do design system). */
+/** Classes de cor semânticas por status (tokens do design system e utilitários Tailwind). */
 export function statusClasses(field: EditableField, value: string): string {
   if (field === "status_coleta") {
     return value === "Coletado"
@@ -170,13 +181,17 @@ export function statusClasses(field: EditableField, value: string): string {
     return "bg-neutro text-neutro-foreground";
   }
   const vUpper = normSituacao(value);
-  if (vUpper === "AGUARDANDO") return "bg-pendente text-pendente-foreground";
+  if (vUpper === "AG. TRATATIVA" || vUpper === "AGUARDANDO") return "bg-pendente text-pendente-foreground";
   if (vUpper === "ERRO SISTEMICO" || vUpper === "PROBLEMA INTEGRACAO") return "bg-erro text-erro-foreground";
   if (vUpper === "AG. COLETA") return "bg-finalizado text-finalizado-foreground";
   if (vUpper === "AG. MOVIMENTACAO") return "bg-chip text-muted-foreground";
   if (vUpper === "COBRAR MOVIMENTACAO") return "bg-neutro text-neutro-foreground";
   if (vUpper === "NAO LIBERADO PELA LOJA") return "bg-naoentregue text-naoentregue-foreground";
   if (vUpper === "BAIXO VOLUME") return "bg-chip text-muted-foreground";
+  if (vUpper === "TRATADO PELO SAC") return "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300";
+  if (vUpper === "EM BUSCA / EXTRAVIO") return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
+  if (vUpper === "FORA DA ABRANGENCIA") return "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-300";
+  if (vUpper === "ALTO VALOR") return "bg-purple-100 text-purple-900 dark:bg-purple-900/40 dark:text-purple-300";
   return "bg-neutro text-neutro-foreground";
 }
 

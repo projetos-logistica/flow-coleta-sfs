@@ -275,10 +275,11 @@ export function AgingBacklogView({
       else if (faixa === "7_10_dias") row.dias_7_10 += 1;
       else if (faixa === "11_mais") row.dias_11_mais += 1;
 
-      // Conta como tratado apenas se estiver em atraso (fora de "no_prazo") e com situação diferente de "AGUARDANDO"
+      // Conta como tratado apenas se estiver em atraso (fora de "no_prazo") e com situação diferente de "AG. TRATATIVA" e "AGUARDANDO"
       if (
         faixa !== "no_prazo" &&
         Boolean(p.situacao) &&
+        p.situacao.trim().toUpperCase() !== "AG. TRATATIVA" &&
         p.situacao.trim().toUpperCase() !== "AGUARDANDO"
       ) {
         row.pedidosTratados += 1;
@@ -1082,7 +1083,7 @@ export function AgingBacklogView({
                   <th
                     onClick={() => handleHeaderSort("tratados")}
                     className="py-3 px-3 font-bold text-center min-w-[130px] cursor-pointer hover:brightness-95 transition group bg-sky-50/80 text-sky-800"
-                    title="Pedidos em atraso com situação diferente de AGUARDANDO"
+                    title="Pedidos em atraso com situação diferente de AG. TRATATIVA"
                   >
                     <div className="flex items-center justify-center gap-1">
                       <span>Pedidos Tratados</span>
