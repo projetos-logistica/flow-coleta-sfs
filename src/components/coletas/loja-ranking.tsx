@@ -89,7 +89,7 @@ export function LojaRanking({
 
       {lojas.length === 0 ? (
         <p className="py-4 text-center text-xs text-slate-400">
-          Nenhum pedido aguardando.
+          Nenhum pedido em ag. tratativa.
         </p>
       ) : (
         <div className="max-h-[560px] space-y-1 overflow-y-auto pr-1">

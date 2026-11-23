@@ -403,12 +403,11 @@ function Painel() {
     let totalCriticosAtrasadosGeral = 0;
 
     pedidosGlobal
-      .filter(
-        (p) =>
-          p.status_coleta === "Pendente" &&
-          (normSituacao(p.situacao) === normSituacao("AG. TRATATIVA") ||
-            normSituacao(p.situacao) === normSituacao("AGUARDANDO")),
-      )
+      .filter((p) => {
+        if (p.status_coleta !== "Pendente") return false;
+        const sit = p.situacao?.trim().toUpperCase();
+        return sit === "AG. TRATATIVA" || sit === "AGUARDANDO";
+      })
       .forEach((p) => {
         const item =
           mapa.get(p.nome_loja) ??
