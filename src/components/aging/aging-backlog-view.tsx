@@ -231,8 +231,17 @@ export function AgingBacklogView({
         !filtroTransportadora.includes(p.transportadora)
       )
         return false;
-      if (filtroSituacao.length > 0 && !filtroSituacao.includes(p.situacao))
-        return false;
+      if (filtroSituacao.length > 0) {
+        const sit = (p.situacao ?? "").trim().toUpperCase();
+        const bateuSituacao = filtroSituacao.some((fs) => {
+          const fsNorm = fs.trim().toUpperCase();
+          if (fsNorm === "AG. TRATATIVA") {
+            return sit === "AG. TRATATIVA" || sit === "AGUARDANDO";
+          }
+          return sit === fsNorm;
+        });
+        if (!bateuSituacao) return false;
+      }
 
       if (todosTermos.length > 0) {
         const conteudo = `${p.numero_pedido} ${p.nome_loja} ${p.transportadora} ${p.marca} ${p.origem} ${p.uf_origem ?? ""} ${p.situacao} ${p.romaneio ?? ""}`.toLowerCase();
@@ -275,12 +284,13 @@ export function AgingBacklogView({
       else if (faixa === "7_10_dias") row.dias_7_10 += 1;
       else if (faixa === "11_mais") row.dias_11_mais += 1;
 
-      // Conta como tratado apenas se estiver em atraso (fora de "no_prazo") e com situação diferente de "AG. TRATATIVA" e "AGUARDANDO"
+      // Conta como tratado exclusivamente pedidos em atraso (fora de "no_prazo") já tratados pelo time
+      const sitNorm = (p.situacao ?? "").trim().toUpperCase();
       if (
         faixa !== "no_prazo" &&
-        Boolean(p.situacao) &&
-        p.situacao.trim().toUpperCase() !== "AG. TRATATIVA" &&
-        p.situacao.trim().toUpperCase() !== "AGUARDANDO"
+        sitNorm !== "" &&
+        sitNorm !== "AG. TRATATIVA" &&
+        sitNorm !== "AGUARDANDO"
       ) {
         row.pedidosTratados += 1;
       }
@@ -1083,7 +1093,7 @@ export function AgingBacklogView({
                   <th
                     onClick={() => handleHeaderSort("tratados")}
                     className="py-3 px-3 font-bold text-center min-w-[130px] cursor-pointer hover:brightness-95 transition group bg-sky-50/80 text-sky-800"
-                    title="Pedidos em atraso com situação diferente de AG. TRATATIVA"
+                    title="Pedidos em atraso já tratados (situação diferente de AG. TRATATIVA)"
                   >
                     <div className="flex items-center justify-center gap-1">
                       <span>Pedidos Tratados</span>
