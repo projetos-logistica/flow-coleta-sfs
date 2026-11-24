@@ -176,6 +176,13 @@ export type AplicarStatusInput = {
   onProgress?: (processados: number, total: number, loteAtual: number, totalLotes: number) => void;
 };
 
+export type AplicarAmbosInput = {
+  pedidos: Pedido[];
+  contato: string;
+  situacao: string;
+  onProgress?: (processados: number, total: number, loteAtual: number, totalLotes: number) => void;
+};
+
 export function usePedidos(usuario: string) {
   const queryClient = useQueryClient();
 
@@ -337,6 +344,130 @@ export function usePedidos(usuario: string) {
     },
   });
 
+  const aplicarAmbos = useMutation({
+    mutationFn: async ({
+      pedidos,
+      contato,
+      situacao,
+      onProgress,
+    }: AplicarAmbosInput): Promise<AplicarStatusResultado> => {
+      // Cancela queries em andamento para evitar race conditions no cache durante updates em lote
+      await queryClient.cancelQueries({ queryKey: PEDIDOS_KEY });
+
+      const alvos = pedidos.filter(
+        (p) => p.status_contato !== contato || p.situacao !== situacao,
+      );
+      if (alvos.length === 0) {
+        return { total: 0, sucessos: [], falhas: [] };
+      }
+
+      const agora = new Date().toISOString();
+      const patch: Partial<Pedido> = {
+        status_contato: contato,
+        situacao: situacao,
+        editado_por: usuario,
+        situacao_updated_at: agora,
+        data_alteracao_situacao: agora,
+      };
+
+      // Fracionamento obrigatório em blocos de até 50 pedidos (evita estouro de PostgREST URL e timeout de rede)
+      const lotes = emLotes(alvos, 50);
+      const salvosComSucesso: string[] = [];
+      const falhas: string[] = [];
+
+      for (let i = 0; i < lotes.length; i++) {
+        const lote = lotes[i] ?? [];
+        if (onProgress) {
+          onProgress(salvosComSucesso.length, alvos.length, i + 1, lotes.length);
+        }
+
+        // Até 3 tentativas automáticas com backoff de 1s e 2s em falhas de conexão
+        let loteSalvo = false;
+        let ultimoErro: unknown;
+
+        for (let tentativa = 1; tentativa <= 3; tentativa++) {
+          try {
+            const { data, error } = await supabase
+              .from("pedidos")
+              .update(patch)
+              .in(
+                "numero_pedido",
+                lote.map((p) => p.numero_pedido),
+              )
+              .select("numero_pedido");
+
+            if (error) throw error;
+            if (!data || data.length === 0) {
+              throw new Error("Nenhum pedido foi atualizado pelo banco de dados.");
+            }
+            loteSalvo = true;
+            break;
+          } catch (err) {
+            ultimoErro = err;
+            if (tentativa < 3) {
+              const delay = tentativa === 1 ? 1000 : 2000;
+              await new Promise((r) => setTimeout(r, delay));
+            }
+          }
+        }
+
+        if (loteSalvo) {
+          salvosComSucesso.push(...lote.map((p) => p.numero_pedido));
+        } else {
+          // Lote falhou após 3 retentativas: marca este lote e os restantes como falhas e aborta
+          const restantes = lotes.slice(i).flat().map((p) => p.numero_pedido);
+          falhas.push(...restantes);
+          console.error("Falha definitiva no lote de pedidos (aplicar ambos):", ultimoErro);
+          break;
+        }
+      }
+
+      // Registra no histórico apenas os pedidos que foram efetivamente salvos no banco
+      if (salvosComSucesso.length > 0) {
+        const pedidosSalvos = alvos.filter((p) => salvosComSucesso.includes(p.numero_pedido));
+        const eventosHistorico: { numero_pedido: string; campo: string; valor_anterior: string; valor_novo: string }[] = [];
+
+        for (const p of pedidosSalvos) {
+          if (p.status_contato !== contato) {
+            eventosHistorico.push({
+              numero_pedido: p.numero_pedido,
+              campo: FIELD_LABELS.status_contato,
+              valor_anterior: p.status_contato || "(vazio)",
+              valor_novo: contato,
+            });
+          }
+          if (p.situacao !== situacao) {
+            eventosHistorico.push({
+              numero_pedido: p.numero_pedido,
+              campo: FIELD_LABELS.situacao,
+              valor_anterior: p.situacao || "(vazio)",
+              valor_novo: situacao,
+            });
+          }
+        }
+
+        if (eventosHistorico.length > 0) {
+          await registrarHistorico(usuario, eventosHistorico).catch((err) => {
+            console.warn("Falha ao registrar histórico de auditoria:", err);
+          });
+        }
+      }
+
+      return {
+        total: alvos.length,
+        sucessos: salvosComSucesso,
+        falhas,
+      };
+    },
+    onSuccess: (resultado) => {
+      if (resultado.sucessos.length > 0) {
+        avisarAlteracao();
+        return queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
+      }
+      return undefined;
+    },
+  });
+
   const limparBase = useMutation({
     mutationFn: async (pedidos: Pedido[]) => {
       const { error } = await supabase.from("pedidos").delete().neq("numero_pedido", "");
@@ -357,7 +488,7 @@ export function usePedidos(usuario: string) {
     },
   });
 
-  return { query, aplicarStatus, limparBase, invalidate: () => {
+  return { query, aplicarStatus, aplicarAmbos, limparBase, invalidate: () => {
     avisarAlteracao();
     return queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
   } };

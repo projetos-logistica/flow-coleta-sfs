@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PanelLeftOpen, Copy, AlertTriangle } from "lucide-react";
+import { PanelLeftOpen, Copy, AlertTriangle, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
@@ -142,7 +142,7 @@ function Painel() {
   }, []);
 
   // ─── Query Supabase ───
-  const { query, aplicarStatus, limparBase, invalidate } = usePedidos(usuario);
+  const { query, aplicarStatus, aplicarAmbos, limparBase, invalidate } = usePedidos(usuario);
   const pedidos = useMemo(() => query.data ?? [], [query.data]);
 
   // ─── Marcas disponíveis (coluna MARCA da planilha) ───
@@ -397,17 +397,14 @@ function Painel() {
   // ─── Ranking de lojas (prioridade SLA x volume) ───
   const [abaRanking, setAbaRanking] = useState<RankingAba>("prioridade");
   const [rankingAberto, setRankingAberto] = useState(true);
+  const [rankingExpandido, setRankingExpandido] = useState(false);
 
   const ranking = useMemo(() => {
     const mapa = new Map<string, LojaRankingItem>();
     let totalCriticosAtrasadosGeral = 0;
 
-    pedidosGlobal
-      .filter((p) => {
-        if (p.status_coleta !== "Pendente") return false;
-        const sit = p.situacao?.trim().toUpperCase();
-        return sit === "AG. TRATATIVA" || sit === "AGUARDANDO";
-      })
+    filtrados
+      .filter((p) => p.status_coleta === "Pendente")
       .forEach((p) => {
         const item =
           mapa.get(p.nome_loja) ??
@@ -470,7 +467,7 @@ function Painel() {
     }
 
     return ordenada;
-  }, [pedidosGlobal, abaRanking]);
+  }, [filtrados, abaRanking]);
 
 
   // ─── Filtro global ativo? ───
@@ -553,6 +550,59 @@ function Painel() {
     } catch (e) {
       if (toastId) toast.dismiss(toastId);
       toast.error(mensagemAmigavel(e, "Não consegui aplicar a alteração em massa"));
+    } finally {
+      setAplicandoLote(false);
+      setProgressoLote(null);
+    }
+  }
+
+  async function aplicarAmbosEmMassa(contato: string, situacao: string) {
+    if (selecionados.size === 0 || aplicandoLote) return;
+    const alvos = filtrados.filter((p) => selecionados.has(p.numero_pedido));
+    if (alvos.length === 0) return;
+
+    setAplicandoLote(true);
+    setProgressoLote(null);
+
+    const totalLotes = Math.ceil(alvos.length / 50);
+    const toastId = alvos.length > 50
+      ? toast.loading(`Iniciando atualização de ${alvos.length} pedidos em lotes...`, { duration: 120000 })
+      : undefined;
+
+    try {
+      const resultado = await aplicarAmbos.mutateAsync({
+        pedidos: alvos,
+        contato,
+        situacao,
+        onProgress: (processados, total, loteAtual, numLotes) => {
+          setProgressoLote({ lote: loteAtual, totalLotes: numLotes, processados, total });
+          if (toastId) {
+            toast.loading(
+              `Atualizando lote ${loteAtual} de ${numLotes} (${processados} de ${total} pedidos)...`,
+              { id: toastId, duration: 120000 },
+            );
+          }
+        },
+      });
+
+      if (toastId) toast.dismiss(toastId);
+
+      if (resultado.falhas.length === 0) {
+        toast.success(
+          `Contato e Situação atualizados em ${resultado.sucessos.length} pedido(s).`,
+        );
+        setSelecionados(new Set());
+      } else {
+        // Se houve falha após as retentativas, mantém apenas os não salvos selecionados
+        setSelecionados(new Set(resultado.falhas));
+        toast.warning(
+          `${resultado.sucessos.length} de ${alvos.length} pedidos atualizados com êxito. Ocorreu falha de conexão em ${resultado.falhas.length} pedido(s) após 3 tentativas. Eles continuam selecionados na tabela para você tentar novamente.`,
+          { duration: 10000 },
+        );
+      }
+    } catch (e) {
+      if (toastId) toast.dismiss(toastId);
+      toast.error(mensagemAmigavel(e, "Não consegui aplicar Contato e Situação"));
     } finally {
       setAplicandoLote(false);
       setProgressoLote(null);
@@ -886,11 +936,16 @@ function Painel() {
 
       {/* 4. ÁREA PRINCIPAL: Sidebar de Lojas + Tabela */}
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
-        {/* Coluna Esquerda: Ranking de Lojas (~32%) — retrátil */}
+        {/* Coluna Esquerda: Ranking de Lojas (~32% padrão ou ~50% expandido) — retrátil */}
         <div
           className={
             rankingAberto
-              ? "min-w-0 origin-left transition-all duration-300 ease-out lg:col-span-4 xl:col-span-3 translate-x-0 opacity-100"
+              ? cn(
+                  "min-w-0 origin-left transition-all duration-300 ease-out translate-x-0 opacity-100",
+                  rankingExpandido
+                    ? "lg:col-span-6 xl:col-span-6"
+                    : "lg:col-span-4 xl:col-span-3",
+                )
               : "hidden"
           }
         >
@@ -899,7 +954,12 @@ function Painel() {
             onAbaChange={setAbaRanking}
             lojas={ranking}
             active={filtroLoja}
-            onRecolher={() => setRankingAberto(false)}
+            onRecolher={() => {
+              setRankingAberto(false);
+              setRankingExpandido(false);
+            }}
+            isExpanded={rankingExpandido}
+            onToggleExpand={() => setRankingExpandido((prev) => !prev)}
             onSelect={(nome) =>
               setFiltroLoja((prev) =>
                 prev.includes(nome)
@@ -925,11 +985,16 @@ function Painel() {
           />
         </div>
 
-        {/* Coluna Direita: Tabela (~68% ou 100% em modo foco) */}
+        {/* Coluna Direita: Tabela (~68% padrão, ~50% com ranking expandido, ou 100% em modo foco) */}
         <div
           className={
             rankingAberto
-              ? "min-w-0 transition-all duration-300 ease-out lg:col-span-8 xl:col-span-9"
+              ? cn(
+                  "min-w-0 transition-all duration-300 ease-out",
+                  rankingExpandido
+                    ? "lg:col-span-6 xl:col-span-6"
+                    : "lg:col-span-8 xl:col-span-9",
+                )
               : "min-w-0 w-full transition-all duration-300 ease-out lg:col-span-12"
           }
         >
@@ -1003,6 +1068,26 @@ function Painel() {
                   : aplicandoLote
                   ? "Salvando..."
                   : "Aplicar Situação"}
+              </button>
+
+              <button
+                type="button"
+                disabled={aplicandoLote}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition",
+                  aplicandoLote
+                    ? "bg-emerald-400 cursor-not-allowed opacity-75"
+                    : "bg-emerald-600 hover:bg-emerald-700 cursor-pointer shadow-xs",
+                )}
+                onClick={() => aplicarAmbosEmMassa(bulk.contato, bulk.situacao)}
+                title="Atualiza Status Contato e Situação simultaneamente em uma única operação"
+              >
+                <CheckCheck className="size-3.5" />
+                {aplicandoLote && progressoLote
+                  ? `Atualizando ${progressoLote.lote}/${progressoLote.totalLotes}...`
+                  : aplicandoLote
+                  ? "Salvando..."
+                  : "Aplicar Ambos"}
               </button>
 
               <button

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { PanelLeftClose, Store } from "lucide-react";
+import { Maximize2, Minimize2, PanelLeftClose, Store } from "lucide-react";
 
 export type LojaRankingItem = {
   nome: string;
@@ -24,6 +24,8 @@ export function LojaRanking({
   aba,
   onAbaChange,
   onRecolher,
+  isExpanded = false,
+  onToggleExpand,
 }: {
   lojas: LojaRankingItem[];
   active: string[];
@@ -32,6 +34,8 @@ export function LojaRanking({
   aba: RankingAba;
   onAbaChange: (a: RankingAba) => void;
   onRecolher?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }) {
   return (
     <aside className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -48,13 +52,28 @@ export function LojaRanking({
               {active.length} sel.
             </span>
           )}
+          {onToggleExpand && (
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-label={isExpanded ? "Restaurar largura padrão" : "Expandir Ranking de Lojas"}
+              title={isExpanded ? "Restaurar largura padrão" : "Expandir Ranking de Lojas"}
+              className="inline-flex size-6 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+            >
+              {isExpanded ? (
+                <Minimize2 className="size-3.5" />
+              ) : (
+                <Maximize2 className="size-3.5" />
+              )}
+            </button>
+          )}
           {onRecolher && (
             <button
               type="button"
               onClick={onRecolher}
               aria-label="Recolher ranking de lojas"
               title="Recolher painel"
-              className="inline-flex size-6 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              className="inline-flex size-6 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
             >
               <PanelLeftClose className="size-3.5" />
             </button>
@@ -89,7 +108,7 @@ export function LojaRanking({
 
       {lojas.length === 0 ? (
         <p className="py-4 text-center text-xs text-slate-400">
-          Nenhum pedido em ag. tratativa.
+          Nenhum pedido encontrado para os filtros selecionados.
         </p>
       ) : (
         <div className="max-h-[560px] space-y-1 overflow-y-auto pr-1">
@@ -136,7 +155,8 @@ export function LojaRanking({
                     </span>
                     <span
                       className={cn(
-                        "truncate text-xs font-semibold",
+                        "text-xs font-semibold",
+                        isExpanded ? "break-words" : "truncate",
                         isActive ? "text-indigo-900" : "text-slate-700",
                       )}
                     >
