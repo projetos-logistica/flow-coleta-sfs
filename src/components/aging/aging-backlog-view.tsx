@@ -232,9 +232,19 @@ export function AgingBacklogView({
       )
         return false;
       if (filtroSituacao.length > 0) {
-        const sit = (p.situacao ?? "").trim().toUpperCase();
+        const sit = (p.situacao ?? "")
+          .trim()
+          .toUpperCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s*\(AUTOMATICO APOS 48H\)\s*/g, "")
+          .trim();
         const bateuSituacao = filtroSituacao.some((fs) => {
-          const fsNorm = fs.trim().toUpperCase();
+          const fsNorm = fs
+            .trim()
+            .toUpperCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
           if (fsNorm === "AG. TRATATIVA") {
             return sit === "AG. TRATATIVA" || sit === "AGUARDANDO";
           }

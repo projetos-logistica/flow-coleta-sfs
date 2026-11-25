@@ -53,13 +53,15 @@ export const SITUACAO_OPTIONS = [
 ] as const;
 
 
-/** Normaliza situação (maiúsculas, sem acentos) para comparações seguras. */
+/** Normaliza situação (maiúsculas, sem acentos e sem sufixos legados de automação) para comparações seguras. */
 export function normSituacao(v?: string | null): string {
   return String(v ?? "")
     .trim()
     .toUpperCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*\(AUTOMATICO APOS 48H\)\s*/g, "")
+    .trim();
 }
 
 /** Dicionário oficial de legendas exibidas nas tooltips de Situação. */
