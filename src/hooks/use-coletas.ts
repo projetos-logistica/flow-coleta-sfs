@@ -98,7 +98,9 @@ export async function fetchPedidos(): Promise<Pedido[]> {
   let lastId: string | null = null;
 
   while (true) {
-    const lote = await comRetentativaSchemaCache(async () => {
+    let lote: Pedido[];
+    try {
+      lote = await comRetentativaSchemaCache(() => comRetentativas(async () => {
       let q = supabase
         .from("pedidos")
         .select(PEDIDOS_COLS)
@@ -110,7 +112,7 @@ export async function fetchPedidos(): Promise<Pedido[]> {
         q = q.gt("numero_pedido", lastId);
       }
 
-      const { data, error } = await q.abortSignal(AbortSignal.timeout(20000));
+      const { data, error } = await q.abortSignal(AbortSignal.timeout(30000));
       if (error) throw error;
 
       return (data ?? []).map((row) => ({
@@ -118,11 +120,17 @@ export async function fetchPedidos(): Promise<Pedido[]> {
         romaneio: row.romaneio ?? null,
         uf_origem: row.uf_origem ?? null,
       })) as Pedido[];
-    });
+      }));
+    } catch (error) {
+      if (todos.length === 0) throw error;
+      console.warn("Falha ao carregar página de pedidos; retornando páginas já carregadas.", error);
+      return todos;
+    }
 
-    if (lote.length === 0) break;
+    const ultimoPedido = lote.at(-1);
+    if (!ultimoPedido) break;
     todos.push(...lote);
-    lastId = lote[lote.length - 1]!.numero_pedido;
+    lastId = ultimoPedido.numero_pedido;
     if (lote.length < PAGE) break;
   }
 
