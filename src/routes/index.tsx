@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import * as XLSX from "xlsx";
@@ -81,6 +81,43 @@ export const Route = createFileRoute("/")(
   },
 );
 
+
+class TableErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; errorMsg: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMsg: "" };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMsg: error?.message || String(error) };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[OrdersTable ErrorBoundary]", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-6 text-center">
+          <p className="text-sm font-bold text-rose-900">Erro ao renderizar a tabela de pedidos</p>
+          <p className="mt-1 text-xs text-rose-700">{this.state.errorMsg}</p>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false, errorMsg: "" })}
+            className="mt-3 rounded-xl bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
+          >
+            Recarregar tabela
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function Painel() {
   // ─── Navegação Administrativa / Módulos ───
@@ -1114,24 +1151,27 @@ function Painel() {
             </div>
           )}
 
-          {query.isError ? (
+          {query.isError && pedidos.length === 0 ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-8 text-center">
               <AlertTriangle className="mx-auto size-8 text-rose-500 mb-2" />
               <p className="text-sm font-bold text-rose-900">
                 Não foi possível carregar os pedidos
               </p>
               <p className="mt-1 text-xs text-rose-700">
-                {mensagemAmigavel(query.error, "Erro de conexão com o banco")}
+                {(query.error as Error)?.message || mensagemAmigavel(query.error, "Erro de conexão com o banco")}
               </p>
               <button
                 type="button"
-                onClick={() => query.refetch()}
+                onClick={() => {
+                  console.error("[Painel] Tentando recarregar após erro:", query.error);
+                  query.refetch();
+                }}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-rose-700 cursor-pointer"
               >
                 Tentar novamente
               </button>
             </div>
-          ) : query.isLoading ? (
+          ) : query.isLoading && pedidos.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 flex flex-col items-center justify-center gap-2">
               <div className="size-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
               <span className="font-medium">Sincronizando pedidos pendentes...</span>
@@ -1145,36 +1185,38 @@ function Painel() {
               </p>
             </div>
           ) : (
-            <OrdersTable
-              pedidos={paginados}
-              selected={selecionados}
-              onToggle={(id) =>
-                setSelecionados((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(id)) next.delete(id);
-                  else next.add(id);
-                  return next;
-                })
-              }
-              onToggleAll={(checked) =>
-                setSelecionados(
-                  checked ? new Set(paginados.map((p) => p.numero_pedido)) : new Set(),
-                )
-              }
-              onChangeField={alterarCampo}
-              buscaTags={buscaTags}
-              onBuscaTagsChange={setBuscaTags}
-              buscaTexto={buscaTexto}
-              onBuscaTextoChange={setBuscaTexto}
-              filtroContato={filtroContato}
-              onFiltroContatoChange={setFiltroContato}
-              pagina={paginaAtual}
-              totalPaginas={totalPaginas}
-              porPagina={porPagina}
-              onPaginaChange={setPagina}
-              onPorPaginaChange={setPorPagina}
-              totalRegistros={filtrados.length}
-            />
+            <TableErrorBoundary>
+              <OrdersTable
+                pedidos={paginados}
+                selected={selecionados}
+                onToggle={(id) =>
+                  setSelecionados((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  })
+                }
+                onToggleAll={(checked) =>
+                  setSelecionados(
+                    checked ? new Set(paginados.map((p) => p.numero_pedido)) : new Set(),
+                  )
+                }
+                onChangeField={alterarCampo}
+                buscaTags={buscaTags}
+                onBuscaTagsChange={setBuscaTags}
+                buscaTexto={buscaTexto}
+                onBuscaTextoChange={setBuscaTexto}
+                filtroContato={filtroContato}
+                onFiltroContatoChange={setFiltroContato}
+                pagina={paginaAtual}
+                totalPaginas={totalPaginas}
+                porPagina={porPagina}
+                onPaginaChange={setPagina}
+                onPorPaginaChange={setPorPagina}
+                totalRegistros={filtrados.length}
+              />
+            </TableErrorBoundary>
           )}
         </div>
       </div>
