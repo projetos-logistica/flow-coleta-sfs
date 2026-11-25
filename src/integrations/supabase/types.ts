@@ -47,27 +47,27 @@ export type Database = {
       importacoes_backup: {
         Row: {
           created_at: string
-          criado_por: string
+          criado_por: string | null
           dados_snapshot: Json
           id: string
-          nome_arquivo: string
-          total_pedidos: number
+          nome_arquivo: string | null
+          total_pedidos: number | null
         }
         Insert: {
           created_at?: string
-          criado_por: string
+          criado_por?: string | null
           dados_snapshot: Json
           id?: string
-          nome_arquivo: string
-          total_pedidos: number
+          nome_arquivo?: string | null
+          total_pedidos?: number | null
         }
         Update: {
           created_at?: string
-          criado_por?: string
+          criado_por?: string | null
           dados_snapshot?: Json
           id?: string
-          nome_arquivo?: string
-          total_pedidos?: number
+          nome_arquivo?: string | null
+          total_pedidos?: number | null
         }
         Relationships: []
       }
