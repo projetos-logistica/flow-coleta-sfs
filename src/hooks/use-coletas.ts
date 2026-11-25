@@ -66,47 +66,40 @@ export async function registrarHistorico(usuario: string, eventos: HistoricoInpu
 const PEDIDOS_COLS =
   "numero_pedido,romaneio,data_pedido,nome_loja,transportadora,origem,uf_origem,marca,uf_destino,escala_coleta,status_coleta,status_contato,situacao,coletado_at,data_coleta,importado_at,situacao_updated_at,data_alteracao_situacao,created_at,updated_at,importado_por,editado_por";
 
-/** Busca paginada paralela apenas dos pedidos Pendentes (fila ativa). */
+/** Busca sequencial via cursor (sem OFFSET alto e sem Promise.all paralelo) apenas dos pedidos Pendentes. */
 export async function fetchPedidos(): Promise<Pedido[]> {
   const PAGE = 1000;
-  const pagina = (from: number) =>
-    comRetentativas(async () => {
-      const { data, error } = await supabase
-        .from("pedidos")
-        .select(PEDIDOS_COLS)
-        .eq("status_coleta", "Pendente")
-        .order("created_at", { ascending: true })
-        .order("numero_pedido", { ascending: true })
-        .range(from, from + PAGE - 1);
-      if (error) throw error;
-      return (data ?? []).map((row) => ({
-        ...row,
-        romaneio: row.romaneio ?? null,
-        uf_origem: row.uf_origem ?? null,
-      })) as Pedido[];
-    });
-
-  // Descobre o total de pendentes e baixa as páginas em paralelo (máximo 2 por vez).
-  const { count, error } = await comRetentativas(async () =>
-    await supabase
-      .from("pedidos")
-      .select("numero_pedido", { count: "exact", head: true })
-      .eq("status_coleta", "Pendente"),
-  );
-  if (error) throw error;
-  const total = count ?? 0;
-  if (total === 0) return [];
-
-  const inicios: number[] = [];
-  for (let f = 0; f < total; f += PAGE) inicios.push(f);
-
   const todos: Pedido[] = [];
-  for (const grupo of emLotes(inicios, 2)) {
-    const res = await Promise.all(grupo.map(pagina));
-    for (const r of res) todos.push(...r);
+  let lastId = "";
+
+  while (true) {
+    let q = supabase
+      .from("pedidos")
+      .select(PEDIDOS_COLS)
+      .eq("status_coleta", "Pendente")
+      .order("numero_pedido", { ascending: true })
+      .limit(PAGE);
+
+    if (lastId) {
+      q = q.gt("numero_pedido", lastId);
+    }
+
+    const { data, error } = await q.abortSignal(AbortSignal.timeout(20000));
+    if (error) throw error;
+
+    const lote = (data ?? []).map((row) => ({
+      ...row,
+      romaneio: row.romaneio ?? null,
+      uf_origem: row.uf_origem ?? null,
+    })) as Pedido[];
+
+    if (lote.length === 0) break;
+    todos.push(...lote);
+    lastId = lote[lote.length - 1]!.numero_pedido;
+    if (lote.length < PAGE) break;
   }
-  const vistos = new Set<string>();
-  return todos.filter((p) => (vistos.has(p.numero_pedido) ? false : (vistos.add(p.numero_pedido), true)));
+
+  return todos;
 }
 
 /** Contagem leve de pedidos Coletados sem trafegar linhas. */
@@ -213,17 +206,21 @@ export function usePedidos(usuario: string) {
   const query = useQuery({
     queryKey: PEDIDOS_KEY,
     queryFn: fetchPedidos,
-    refetchInterval: 180000,
-    staleTime: 1000 * 60 * 3,
+    refetchInterval: 300000,
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 
   const coletadosCountQuery = useQuery({
     queryKey: ["pedidos-coletados-count"],
     queryFn: fetchColetadosCount,
-    refetchInterval: 180000,
-    staleTime: 1000 * 60 * 3,
+    refetchInterval: 300000,
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 
   // Sincronização entre computadores via aviso leve (broadcast): não pesa no
@@ -280,8 +277,8 @@ export function usePedidos(usuario: string) {
         patch.data_alteracao_situacao = agora;
       }
 
-      // Fracionamento obrigatório em blocos de até 50 pedidos (evita estouro de PostgREST URL e timeout de rede)
-      const lotes = emLotes(alvos, 50);
+      // Fracionamento obrigatório em blocos de até 20 pedidos com pausa de 150ms e timeout de 20s
+      const lotes = emLotes(alvos, 20);
       const salvosComSucesso: string[] = [];
       const falhas: string[] = [];
 
@@ -291,11 +288,11 @@ export function usePedidos(usuario: string) {
           onProgress(salvosComSucesso.length, alvos.length, i + 1, lotes.length);
         }
 
-        // Até 3 tentativas automáticas com backoff de 1s e 2s em falhas de conexão
+        // Até 2 tentativas automáticas com timeout de 20s por lote
         let loteSalvo = false;
         let ultimoErro: unknown;
 
-        for (let tentativa = 1; tentativa <= 3; tentativa++) {
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
           try {
             const { data, error } = await supabase
               .from("pedidos")
@@ -304,7 +301,8 @@ export function usePedidos(usuario: string) {
                 "numero_pedido",
                 lote.map((p) => p.numero_pedido),
               )
-              .select("numero_pedido");
+              .select("numero_pedido")
+              .abortSignal(AbortSignal.timeout(20000));
 
             if (error) throw error;
             if (!data || data.length === 0) {
@@ -314,17 +312,19 @@ export function usePedidos(usuario: string) {
             break;
           } catch (err) {
             ultimoErro = err;
-            if (tentativa < 3) {
-              const delay = tentativa === 1 ? 1000 : 2000;
-              await new Promise((r) => setTimeout(r, delay));
+            if (tentativa < 2) {
+              await new Promise((r) => setTimeout(r, 800));
             }
           }
         }
 
         if (loteSalvo) {
           salvosComSucesso.push(...lote.map((p) => p.numero_pedido));
+          if (i < lotes.length - 1) {
+            await new Promise((r) => setTimeout(r, 150));
+          }
         } else {
-          // Lote falhou após 3 retentativas: marca este lote e os restantes como falhas e aborta
+          // Lote falhou: marca este lote e os restantes como falhas e aborta
           const restantes = lotes.slice(i).flat().map((p) => p.numero_pedido);
           falhas.push(...restantes);
           console.error("Falha definitiva no lote de pedidos:", ultimoErro);
@@ -389,8 +389,8 @@ export function usePedidos(usuario: string) {
         data_alteracao_situacao: agora,
       };
 
-      // Fracionamento obrigatório em blocos de até 50 pedidos (evita estouro de PostgREST URL e timeout de rede)
-      const lotes = emLotes(alvos, 50);
+      // Fracionamento obrigatório em blocos de até 20 pedidos com pausa de 150ms e timeout de 20s
+      const lotes = emLotes(alvos, 20);
       const salvosComSucesso: string[] = [];
       const falhas: string[] = [];
 
@@ -400,11 +400,11 @@ export function usePedidos(usuario: string) {
           onProgress(salvosComSucesso.length, alvos.length, i + 1, lotes.length);
         }
 
-        // Até 3 tentativas automáticas com backoff de 1s e 2s em falhas de conexão
+        // Até 2 tentativas automáticas com timeout de 20s por lote
         let loteSalvo = false;
         let ultimoErro: unknown;
 
-        for (let tentativa = 1; tentativa <= 3; tentativa++) {
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
           try {
             const { data, error } = await supabase
               .from("pedidos")
@@ -413,7 +413,8 @@ export function usePedidos(usuario: string) {
                 "numero_pedido",
                 lote.map((p) => p.numero_pedido),
               )
-              .select("numero_pedido");
+              .select("numero_pedido")
+              .abortSignal(AbortSignal.timeout(20000));
 
             if (error) throw error;
             if (!data || data.length === 0) {
@@ -423,17 +424,19 @@ export function usePedidos(usuario: string) {
             break;
           } catch (err) {
             ultimoErro = err;
-            if (tentativa < 3) {
-              const delay = tentativa === 1 ? 1000 : 2000;
-              await new Promise((r) => setTimeout(r, delay));
+            if (tentativa < 2) {
+              await new Promise((r) => setTimeout(r, 800));
             }
           }
         }
 
         if (loteSalvo) {
           salvosComSucesso.push(...lote.map((p) => p.numero_pedido));
+          if (i < lotes.length - 1) {
+            await new Promise((r) => setTimeout(r, 150));
+          }
         } else {
-          // Lote falhou após 3 retentativas: marca este lote e os restantes como falhas e aborta
+          // Lote falhou: marca este lote e os restantes como falhas e aborta
           const restantes = lotes.slice(i).flat().map((p) => p.numero_pedido);
           falhas.push(...restantes);
           console.error("Falha definitiva no lote de pedidos (aplicar ambos):", ultimoErro);
