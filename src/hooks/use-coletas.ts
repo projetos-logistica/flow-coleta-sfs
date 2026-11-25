@@ -66,32 +66,59 @@ export async function registrarHistorico(usuario: string, eventos: HistoricoInpu
 const PEDIDOS_COLS =
   "numero_pedido,romaneio,data_pedido,nome_loja,transportadora,origem,uf_origem,marca,uf_destino,escala_coleta,status_coleta,status_contato,situacao,coletado_at,data_coleta,importado_at,situacao_updated_at,data_alteracao_situacao,created_at,updated_at,importado_por,editado_por";
 
+async function comRetentativaSchemaCache<T>(fn: () => Promise<T>): Promise<T> {
+  const delays = [2000, 4000, 6000];
+  let ultimoErro: unknown;
+  for (let tentativa = 0; tentativa <= delays.length; tentativa++) {
+    try {
+      return await fn();
+    } catch (err) {
+      ultimoErro = err;
+      const msg = String((err as { message?: string })?.message ?? err ?? "").toLowerCase();
+      const status = (err as { status?: number })?.status;
+      const ehSchemaOuServer =
+        msg.includes("schema cache") ||
+        msg.includes("503") ||
+        msg.includes("500") ||
+        status === 503 ||
+        status === 500;
+      if (!ehSchemaOuServer || tentativa === delays.length) {
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, delays[tentativa]));
+    }
+  }
+  throw ultimoErro;
+}
+
 /** Busca sequencial via cursor (sem OFFSET alto e sem Promise.all paralelo) apenas dos pedidos Pendentes. */
 export async function fetchPedidos(): Promise<Pedido[]> {
   const PAGE = 1000;
   const todos: Pedido[] = [];
-  let lastId = "";
+  let lastId: string | null = null;
 
   while (true) {
-    let q = supabase
-      .from("pedidos")
-      .select(PEDIDOS_COLS)
-      .eq("status_coleta", "Pendente")
-      .order("numero_pedido", { ascending: true })
-      .limit(PAGE);
+    const lote = await comRetentativaSchemaCache(async () => {
+      let q = supabase
+        .from("pedidos")
+        .select(PEDIDOS_COLS)
+        .eq("status_coleta", "Pendente")
+        .order("numero_pedido", { ascending: true })
+        .limit(PAGE);
 
-    if (lastId) {
-      q = q.gt("numero_pedido", lastId);
-    }
+      if (lastId !== null) {
+        q = q.gt("numero_pedido", lastId);
+      }
 
-    const { data, error } = await q.abortSignal(AbortSignal.timeout(20000));
-    if (error) throw error;
+      const { data, error } = await q.abortSignal(AbortSignal.timeout(20000));
+      if (error) throw error;
 
-    const lote = (data ?? []).map((row) => ({
-      ...row,
-      romaneio: row.romaneio ?? null,
-      uf_origem: row.uf_origem ?? null,
-    })) as Pedido[];
+      return (data ?? []).map((row) => ({
+        ...row,
+        romaneio: row.romaneio ?? null,
+        uf_origem: row.uf_origem ?? null,
+      })) as Pedido[];
+    });
 
     if (lote.length === 0) break;
     todos.push(...lote);
@@ -104,14 +131,14 @@ export async function fetchPedidos(): Promise<Pedido[]> {
 
 /** Contagem leve de pedidos Coletados sem trafegar linhas. */
 export async function fetchColetadosCount(): Promise<number> {
-  const { count, error } = await comRetentativas(async () =>
-    await supabase
+  return comRetentativaSchemaCache(async () => {
+    const { count, error } = await supabase
       .from("pedidos")
       .select("numero_pedido", { count: "exact", head: true })
-      .eq("status_coleta", "Coletado"),
-  );
-  if (error) throw error;
-  return count ?? 0;
+      .eq("status_coleta", "Coletado");
+    if (error) throw error;
+    return count ?? 0;
+  });
 }
 
 /** Remove pedidos coletados há 2+ dias úteis, registrando no histórico. */
