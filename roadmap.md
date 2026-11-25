@@ -1,5 +1,6 @@
 # Import roadmap
-- [ ] Measure runtime credits and database load, optimize confirmed bottlenecks, and verify outcomes.
+- [x] Measure runtime credits and inspect database queries, indexes, schedules, and application reads.
+- [ ] Optimize and verify database bottlenecks — blocked by hosted backend connectivity; restart approval requested.
 - [x] Inspect and import all application pages, controls, and source assets.
 - [x] Migrate collection schema, bulk import functions, and access boundaries to Cloud.
 - [x] Verify desktop/phone login, real CSV import and readback, persisted update, XLSX/history export, delta collection, and temporary record cleanup.
