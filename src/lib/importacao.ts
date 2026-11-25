@@ -373,7 +373,7 @@ export async function restaurarBackupImportacao(
   }
 
   // Excluir pedidos que não existiam no snapshot
-  const idsSnapshot = new Set(snapshot.map((p) => String(p.numero_pedido ?? "")));
+  const idsSnapshot = new Set(snapshot.map((p) => String(p["numero_pedido"] ?? "")));
   const idsParaRemover = idsAtuais.filter((id) => !idsSnapshot.has(id));
 
   for (let i = 0; i < idsParaRemover.length; i += 200) {
