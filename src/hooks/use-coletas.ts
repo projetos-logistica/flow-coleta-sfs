@@ -63,14 +63,18 @@ export async function registrarHistorico(usuario: string, eventos: HistoricoInpu
   }
 }
 
-/** Busca paginada: o Data API limita cada resposta a 1000 linhas. */
+const PEDIDOS_COLS =
+  "numero_pedido,romaneio,data_pedido,nome_loja,transportadora,origem,uf_origem,marca,uf_destino,escala_coleta,status_coleta,status_contato,situacao,coletado_at,data_coleta,importado_at,situacao_updated_at,data_alteracao_situacao,created_at,updated_at,importado_por,editado_por";
+
+/** Busca paginada paralela apenas dos pedidos Pendentes (fila ativa). */
 export async function fetchPedidos(): Promise<Pedido[]> {
   const PAGE = 1000;
   const pagina = (from: number) =>
     comRetentativas(async () => {
       const { data, error } = await supabase
         .from("pedidos")
-        .select("*")
+        .select(PEDIDOS_COLS)
+        .eq("status_coleta", "Pendente")
         .order("created_at", { ascending: true })
         .order("numero_pedido", { ascending: true })
         .range(from, from + PAGE - 1);
@@ -81,20 +85,40 @@ export async function fetchPedidos(): Promise<Pedido[]> {
         uf_origem: row.uf_origem ?? null,
       })) as Pedido[];
     });
-  // Descobre o total e baixa as páginas em paralelo (4 por vez).
+
+  // Descobre o total de pendentes e baixa as páginas em paralelo (5 por vez).
   const { count, error } = await comRetentativas(async () =>
-    await supabase.from("pedidos").select("numero_pedido", { count: "exact", head: true }),
+    await supabase
+      .from("pedidos")
+      .select("numero_pedido", { count: "exact", head: true })
+      .eq("status_coleta", "Pendente"),
   );
   if (error) throw error;
+  const total = count ?? 0;
+  if (total === 0) return [];
+
   const inicios: number[] = [];
-  for (let f = 0; f < (count ?? 0) + PAGE; f += PAGE) inicios.push(f);
+  for (let f = 0; f < total; f += PAGE) inicios.push(f);
+
   const todos: Pedido[] = [];
-  for (const grupo of emLotes(inicios, 4)) {
+  for (const grupo of emLotes(inicios, 5)) {
     const res = await Promise.all(grupo.map(pagina));
     for (const r of res) todos.push(...r);
   }
   const vistos = new Set<string>();
   return todos.filter((p) => (vistos.has(p.numero_pedido) ? false : (vistos.add(p.numero_pedido), true)));
+}
+
+/** Contagem leve de pedidos Coletados sem trafegar linhas. */
+export async function fetchColetadosCount(): Promise<number> {
+  const { count, error } = await comRetentativas(async () =>
+    await supabase
+      .from("pedidos")
+      .select("numero_pedido", { count: "exact", head: true })
+      .eq("status_coleta", "Coletado"),
+  );
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /** Remove pedidos coletados há 2+ dias úteis, registrando no histórico. */
@@ -189,8 +213,16 @@ export function usePedidos(usuario: string) {
   const query = useQuery({
     queryKey: PEDIDOS_KEY,
     queryFn: fetchPedidos,
-    refetchInterval: 120000,
-    staleTime: 30000,
+    refetchInterval: 180000,
+    staleTime: 1000 * 60 * 3,
+    refetchOnWindowFocus: false,
+  });
+
+  const coletadosCountQuery = useQuery({
+    queryKey: ["pedidos-coletados-count"],
+    queryFn: fetchColetadosCount,
+    refetchInterval: 180000,
+    staleTime: 1000 * 60 * 3,
     refetchOnWindowFocus: false,
   });
 
@@ -221,17 +253,35 @@ export function usePedidos(usuario: string) {
       .catch(() => undefined);
   }, [query.data, usuario, queryClient]);
 
-  // Transição automática AG. MOVIMENTAÇÃO → COBRAR MOVIMENTAÇÃO após 48h.
+  // Transição automática AG. MOVIMENTAÇÃO → COBRAR MOVIMENTAÇÃO após 48h (em segundo plano, máx. 1x a cada 15 min).
   useEffect(() => {
     if (!query.data || query.data.length === 0) return;
-    aplicarRegra48hMovimentacao(query.data, usuario)
-      .then((n) => {
-        if (n > 0) {
-          queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
-          avisarAlteracao();
-        }
-      })
-      .catch(() => undefined);
+    const CHAVE_48H = "flow_ultima_execucao_48h";
+    const INTERVALO_15_MIN = 15 * 60 * 1000;
+    try {
+      const ultima = Number(localStorage.getItem(CHAVE_48H) ?? "0");
+      if (Date.now() - ultima < INTERVALO_15_MIN) return;
+    } catch {
+      // ignore storage errors
+    }
+
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(CHAVE_48H, String(Date.now()));
+      } catch {
+        // ignore
+      }
+      aplicarRegra48hMovimentacao(query.data!, usuario)
+        .then((n) => {
+          if (n > 0) {
+            queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
+            avisarAlteracao();
+          }
+        })
+        .catch(() => undefined);
+    }, 3000);
+
+    return () => clearTimeout(timer);
   }, [query.data, usuario, queryClient]);
 
   const aplicarStatus = useMutation({
@@ -488,8 +538,9 @@ export function usePedidos(usuario: string) {
     },
   });
 
-  return { query, aplicarStatus, aplicarAmbos, limparBase, invalidate: () => {
+  return { query, coletadosCount: coletadosCountQuery.data ?? 0, aplicarStatus, aplicarAmbos, limparBase, invalidate: () => {
     avisarAlteracao();
+    queryClient.invalidateQueries({ queryKey: ["pedidos-coletados-count"] });
     return queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
   } };
 }

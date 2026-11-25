@@ -145,7 +145,7 @@ function Painel() {
   }, []);
 
   // ─── Query Supabase ───
-  const { query, aplicarStatus, aplicarAmbos, limparBase, invalidate } = usePedidos(usuario);
+  const { query, coletadosCount, aplicarStatus, aplicarAmbos, limparBase, invalidate } = usePedidos(usuario);
   const pedidos = useMemo(() => query.data ?? [], [query.data]);
 
   // ─── Marcas disponíveis (coluna MARCA da planilha) ───
@@ -926,11 +926,9 @@ function Painel() {
           {
             id: "coletados_hoje",
             label: "Coletados",
-            value: exibirUltimoDiaColetados ? coletadosUltimoDia : coletadosHoje,
+            value: coletadosCount,
             active: filtroKpiCard === "coletados_hoje",
-            tooltip: exibirUltimoDiaColetados
-              ? "Total de pedidos coletados no último dia útil (aguardando a carga de hoje)."
-              : "Quantidade de pedidos que tiveram a coleta confirmada no dia de hoje.",
+            tooltip: "Total de pedidos com status Coletado na base compartilhada.",
             theme: "coletados",
           },
         ]}
@@ -1117,8 +1115,9 @@ function Painel() {
           )}
 
           {query.isLoading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
-              Carregando pedidos...
+            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 flex flex-col items-center justify-center gap-2">
+              <div className="size-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+              <span className="font-medium">Sincronizando pedidos pendentes...</span>
             </div>
           ) : pedidos.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-16 text-center text-slate-500">
