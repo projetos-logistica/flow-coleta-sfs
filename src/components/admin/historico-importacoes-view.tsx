@@ -31,7 +31,6 @@ interface BackupRegistro {
   criado_por: string;
   nome_arquivo: string;
   total_pedidos: number;
-  dados_snapshot: Record<string, unknown>[];
 }
 
 interface HistoricoImportacoesViewProps {
@@ -66,9 +65,9 @@ export function HistoricoImportacoesView({
     try {
       const { data, error } = await supabase
         .from("importacoes_backup")
-        .select("id, created_at, criado_por, nome_arquivo, total_pedidos, dados_snapshot")
+        .select("id, created_at, criado_por, nome_arquivo, total_pedidos")
         .order("created_at", { ascending: false })
-        .limit(3);
+        .limit(2);
 
       if (error) throw error;
       setBackups((data ?? []) as unknown as BackupRegistro[]);
@@ -111,10 +110,20 @@ export function HistoricoImportacoesView({
     );
 
     try {
+      const { data: snapRow, error: snapErr } = await supabase
+        .from("importacoes_backup")
+        .select("dados_snapshot")
+        .eq("id", backupSelecionado.id)
+        .single();
+
+      if (snapErr || !snapRow) {
+        throw new Error("Não foi possível carregar os dados do snapshot para restauração.");
+      }
+
       await restaurarBackupImportacao(
         backupSelecionado.id,
         backupSelecionado.created_at,
-        backupSelecionado.dados_snapshot ?? [],
+        (snapRow.dados_snapshot as unknown as Record<string, unknown>[]) ?? [],
       );
       await queryClient.invalidateQueries();
       await carregarBackups();

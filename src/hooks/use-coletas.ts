@@ -86,7 +86,7 @@ export async function fetchPedidos(): Promise<Pedido[]> {
       })) as Pedido[];
     });
 
-  // Descobre o total de pendentes e baixa as páginas em paralelo (5 por vez).
+  // Descobre o total de pendentes e baixa as páginas em paralelo (máximo 2 por vez).
   const { count, error } = await comRetentativas(async () =>
     await supabase
       .from("pedidos")
@@ -101,7 +101,7 @@ export async function fetchPedidos(): Promise<Pedido[]> {
   for (let f = 0; f < total; f += PAGE) inicios.push(f);
 
   const todos: Pedido[] = [];
-  for (const grupo of emLotes(inicios, 5)) {
+  for (const grupo of emLotes(inicios, 2)) {
     const res = await Promise.all(grupo.map(pagina));
     for (const r of res) todos.push(...r);
   }
@@ -251,37 +251,6 @@ export function usePedidos(usuario: string) {
         }
       })
       .catch(() => undefined);
-  }, [query.data, usuario, queryClient]);
-
-  // Transição automática AG. MOVIMENTAÇÃO → COBRAR MOVIMENTAÇÃO após 48h (em segundo plano, máx. 1x a cada 15 min).
-  useEffect(() => {
-    if (!query.data || query.data.length === 0) return;
-    const CHAVE_48H = "flow_ultima_execucao_48h";
-    const INTERVALO_15_MIN = 15 * 60 * 1000;
-    try {
-      const ultima = Number(localStorage.getItem(CHAVE_48H) ?? "0");
-      if (Date.now() - ultima < INTERVALO_15_MIN) return;
-    } catch {
-      // ignore storage errors
-    }
-
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(CHAVE_48H, String(Date.now()));
-      } catch {
-        // ignore
-      }
-      aplicarRegra48hMovimentacao(query.data!, usuario)
-        .then((n) => {
-          if (n > 0) {
-            queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
-            avisarAlteracao();
-          }
-        })
-        .catch(() => undefined);
-    }, 3000);
-
-    return () => clearTimeout(timer);
   }, [query.data, usuario, queryClient]);
 
   const aplicarStatus = useMutation({

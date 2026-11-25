@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { registrarHistorico } from "@/hooks/use-coletas";
+import { aplicarRegra48hMovimentacao, registrarHistorico } from "@/hooks/use-coletas";
 import { findHeader, formatDate, type Pedido } from "@/lib/coletas";
 import { aguardar, comRetentativas, mensagemAmigavel } from "@/lib/rede";
 
@@ -215,14 +215,14 @@ export async function importarPlanilha(
     throw new Error(`Falha ao salvar backup da importação: ${backupInsertError.message}`);
   }
 
-  // Mantém apenas as 3 cópias mais recentes em importacoes_backup
+  // Mantém apenas as 2 cópias mais recentes em importacoes_backup
   const { data: backupsExistentes } = await supabase
     .from("importacoes_backup")
     .select("id")
     .order("created_at", { ascending: false });
 
-  if (backupsExistentes && backupsExistentes.length > 3) {
-    const idsParaExcluir = backupsExistentes.slice(3).map((b) => b.id);
+  if (backupsExistentes && backupsExistentes.length > 2) {
+    const idsParaExcluir = backupsExistentes.slice(2).map((b) => b.id);
     if (idsParaExcluir.length > 0) {
       await supabase.from("importacoes_backup").delete().in("id", idsParaExcluir);
     }
@@ -335,6 +335,13 @@ export async function importarPlanilha(
     await registrarHistorico(usuario, eventos);
   } catch (e) {
     console.warn(mensagemAmigavel(e, "Falha ao registrar o histórico"));
+  }
+
+  // ─── Etapa 5: Executar regra de 48h (AG. MOVIMENTAÇÃO → COBRAR MOVIMENTAÇÃO) ───
+  try {
+    await aplicarRegra48hMovimentacao(atuais, usuario);
+  } catch (e) {
+    console.warn("Falha não-crítica na regra de 48h pós-importação:", e);
   }
 
   return { novos, mantidos, coletados: coletadosCount };
