@@ -160,7 +160,7 @@ export function HistoricoImportacoesView({
           className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
         >
           <Download className="size-4 text-indigo-600" />
-          Exportar Histórico de Alterações (.csv)
+          Exportar CSV do Histórico
         </button>
       </header>
 
