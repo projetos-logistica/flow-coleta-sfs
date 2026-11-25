@@ -95,11 +95,11 @@ class TableErrorBoundary extends Component<
     return { hasError: true, errorMsg: error?.message || String(error) };
   }
 
-  componentDidCatch(error: Error) {
+  override componentDidCatch(error: Error) {
     console.error("[OrdersTable ErrorBoundary]", error);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-6 text-center">
