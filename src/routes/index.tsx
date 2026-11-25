@@ -45,9 +45,11 @@ import { PanelLeftOpen, Copy, AlertTriangle, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { UsuariosAprovacoesView } from "@/components/admin/usuarios-aprovacoes-view";
+import { HistoricoImportacoesView } from "@/components/admin/historico-importacoes-view";
 import { AgingBacklogView } from "@/components/aging/aging-backlog-view";
 import { useFilters } from "@/contexts/filters-context";
 import { useSidebar } from "@/contexts/sidebar-context";
+import { useRbac } from "@/lib/rbac";
 
 export const Route = createFileRoute("/")(
   {
@@ -82,11 +84,12 @@ export const Route = createFileRoute("/")(
 
 function Painel() {
   // ─── Navegação Administrativa / Módulos ───
-  const [telaAtual, setTelaAtual] = useState<"painel" | "aging" | "usuarios">("painel");
+  const [telaAtual, setTelaAtual] = useState<"painel" | "aging" | "usuarios" | "historico">("painel");
   const { isPinned: sidebarPinned, togglePin: toggleSidebarPin } = useSidebar();
 
   // ─── Estado de Usuário ───
   const [usuario, setUsuario] = useState("");
+  const { isAdmin } = useRbac(usuario);
 
   // ─── Filtros Globais compartilhados (via contexto) ───
   const {
@@ -731,15 +734,27 @@ function Painel() {
       {/* Barra Lateral Global Estilo "Icon Rail" (Collapsed w-16 + Hover w-64 + Pin) */}
       <AdminSidebar
         telaAtual={telaAtual}
-        onSelectTela={(tela) => setTelaAtual(tela)}
-        onExportarHistorico={exportarHistorico}
+        onSelectTela={(tela) => {
+          if (tela === "historico" && !isAdmin) {
+            setTelaAtual("painel");
+            return;
+          }
+          setTelaAtual(tela);
+        }}
+        isAdmin={isAdmin}
         isPinned={sidebarPinned}
         onTogglePin={toggleSidebarPin}
       />
 
       {/* Área de Conteúdo da Rota Ativa */}
       <div className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden">
-        {telaAtual === "usuarios" ? (
+        {telaAtual === "historico" ? (
+          <HistoricoImportacoesView
+            usuarioIdent={usuario}
+            onVoltarPainel={() => setTelaAtual("painel")}
+            onExportarHistorico={exportarHistorico}
+          />
+        ) : telaAtual === "usuarios" ? (
           <UsuariosAprovacoesView
             usuarioIdent={usuario}
             onVoltarPainel={() => setTelaAtual("painel")}

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { registrarHistorico } from "@/hooks/use-coletas";
 import { findHeader, formatDate, type Pedido } from "@/lib/coletas";
 import { aguardar, comRetentativas, mensagemAmigavel } from "@/lib/rede";
@@ -187,6 +188,46 @@ export async function importarPlanilha(
     });
   }
 
+  // ─── Etapa 1.5: Snapshot automático de backup antes de gravar alterações ───
+  onProgresso?.({ enviados: 0, total: upserts.length, etapa: "Gerando backup de segurança" });
+  const snapshotPedidos: Record<string, unknown>[] = [];
+  const PAGE_BACKUP = 1000;
+  for (let from = 0; from < 100000; from += PAGE_BACKUP) {
+    const { data, error } = await supabase
+      .from("pedidos")
+      .select("*")
+      .range(from, from + PAGE_BACKUP - 1);
+    if (error) {
+      throw new Error(`Falha ao gerar backup antes da importação: ${error.message}`);
+    }
+    const lote = (data ?? []) as Record<string, unknown>[];
+    snapshotPedidos.push(...lote);
+    if (lote.length < PAGE_BACKUP) break;
+  }
+
+  const { error: backupInsertError } = await supabase.from("importacoes_backup").insert({
+    criado_por: usuario || "Sistema",
+    nome_arquivo: file.name,
+    total_pedidos: snapshotPedidos.length,
+    dados_snapshot: snapshotPedidos as unknown as Json,
+  });
+  if (backupInsertError) {
+    throw new Error(`Falha ao salvar backup da importação: ${backupInsertError.message}`);
+  }
+
+  // Mantém apenas as 3 cópias mais recentes em importacoes_backup
+  const { data: backupsExistentes } = await supabase
+    .from("importacoes_backup")
+    .select("id")
+    .order("created_at", { ascending: false });
+
+  if (backupsExistentes && backupsExistentes.length > 3) {
+    const idsParaExcluir = backupsExistentes.slice(3).map((b) => b.id);
+    if (idsParaExcluir.length > 0) {
+      await supabase.from("importacoes_backup").delete().in("id", idsParaExcluir);
+    }
+  }
+
   // ─── Etapa 2: Upsert dos pedidos presentes na planilha ───
   // O progresso representa somente as linhas válidas e únicas lidas da planilha.
   const totalPlanilha = upserts.length;
@@ -298,4 +339,67 @@ export async function importarPlanilha(
 
   return { novos, mantidos, coletados: coletadosCount };
 }
+
+/**
+ * Restaura a tabela `pedidos` para o estado exato de um snapshot de backup.
+ * 1. Remove pedidos que não existiam no snapshot.
+ * 2. Faz upsert em lotes de 200 registros com todos os campos originais.
+ * 3. Remove o backup restaurado e eventuais backups posteriores a ele.
+ */
+export async function restaurarBackupImportacao(
+  backupId: string,
+  backupCreatedAt: string,
+  snapshot: Record<string, unknown>[],
+): Promise<void> {
+  // 1. Buscar todos os numero_pedido atuais na tabela pedidos
+  const idsAtuais: string[] = [];
+  const PAGE = 1000;
+  for (let from = 0; from < 100000; from += PAGE) {
+    const { data, error } = await supabase
+      .from("pedidos")
+      .select("numero_pedido")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Erro ao listar pedidos atuais: ${error.message}`);
+    const lote = (data ?? []) as { numero_pedido: string }[];
+    idsAtuais.push(...lote.map((p) => p.numero_pedido));
+    if (lote.length < PAGE) break;
+  }
+
+  // Excluir pedidos que não existiam no snapshot
+  const idsSnapshot = new Set(snapshot.map((p) => String(p.numero_pedido ?? "")));
+  const idsParaRemover = idsAtuais.filter((id) => !idsSnapshot.has(id));
+
+  for (let i = 0; i < idsParaRemover.length; i += 200) {
+    const lote = idsParaRemover.slice(i, i + 200);
+    const { error } = await supabase
+      .from("pedidos")
+      .delete()
+      .in("numero_pedido", lote);
+    if (error) throw new Error(`Erro ao remover pedidos excedentes: ${error.message}`);
+  }
+
+  // 2. Restaurar em lotes de 200 registros via upsert
+  for (let i = 0; i < snapshot.length; i += 200) {
+    const lote = snapshot.slice(i, i + 200);
+    const { error } = await supabase
+      .from("pedidos")
+      .upsert(lote as unknown as never, {
+        onConflict: "numero_pedido",
+        ignoreDuplicates: false,
+      });
+    if (error) throw new Error(`Erro ao restaurar lote de pedidos: ${error.message}`);
+  }
+
+  // 3. Excluir da tabela importacoes_backup o backup restaurado e eventuais posteriores
+  const { error: delError } = await supabase
+    .from("importacoes_backup")
+    .delete()
+    .gte("created_at", backupCreatedAt);
+
+  if (delError) {
+    // Fallback: tenta excluir pelo menos o ID restaurado
+    await supabase.from("importacoes_backup").delete().eq("id", backupId);
+  }
+}
+
 

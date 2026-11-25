@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      importacoes_backup: {
+        Row: {
+          created_at: string
+          criado_por: string
+          dados_snapshot: Json
+          id: string
+          nome_arquivo: string
+          total_pedidos: number
+        }
+        Insert: {
+          created_at?: string
+          criado_por: string
+          dados_snapshot: Json
+          id?: string
+          nome_arquivo: string
+          total_pedidos: number
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string
+          dados_snapshot?: Json
+          id?: string
+          nome_arquivo?: string
+          total_pedidos?: number
+        }
+        Relationships: []
+      }
       pedidos: {
         Row: {
           coletado_at: string | null

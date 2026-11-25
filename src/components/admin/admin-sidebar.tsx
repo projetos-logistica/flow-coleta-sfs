@@ -17,9 +17,9 @@ import {
 } from "@/components/ui/tooltip";
 
 export interface AdminSidebarProps {
-  telaAtual: "painel" | "aging" | "usuarios";
-  onSelectTela: (tela: "painel" | "aging" | "usuarios") => void;
-  onExportarHistorico?: () => void;
+  telaAtual: "painel" | "aging" | "usuarios" | "historico";
+  onSelectTela: (tela: "painel" | "aging" | "usuarios" | "historico") => void;
+  isAdmin?: boolean;
   isPinned?: boolean;
   onTogglePin?: () => void;
   className?: string;
@@ -28,7 +28,7 @@ export interface AdminSidebarProps {
 export function AdminSidebar({
   telaAtual,
   onSelectTela,
-  onExportarHistorico,
+  isAdmin = false,
   isPinned = false,
   onTogglePin,
   className,
@@ -169,44 +169,53 @@ export function AdminSidebar({
               return buttonContent;
             })}
 
-            {/* Separador */}
-            <div className="my-3 border-t border-slate-800/80 px-2" />
+            {/* Ação: Histórico de Alterações (Exclusivo para ADMs) */}
+            {isAdmin && (
+              <>
+                <div className="my-3 border-t border-slate-800/80 px-2" />
+                {(() => {
+                  const isActive = telaAtual === "historico";
+                  const historyButton = (
+                    <button
+                      type="button"
+                      onClick={() => onSelectTela("historico")}
+                      className={cn(
+                        "flex items-center rounded-xl transition-all duration-200 cursor-pointer text-xs font-medium",
+                        isExpanded
+                          ? "w-full gap-3 px-3 py-2.5 text-left"
+                          : "size-11 mx-auto justify-center",
+                        isActive
+                          ? "bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/70",
+                      )}
+                    >
+                      <History
+                        className={cn(
+                          "size-5 shrink-0 transition-colors",
+                          isActive ? "text-white" : "text-slate-400",
+                        )}
+                      />
+                      {isExpanded && (
+                        <span className="truncate flex-1">Histórico de alterações</span>
+                      )}
+                    </button>
+                  );
 
-            {/* Ação: Histórico de Alterações */}
-            {(() => {
-              const historyButton = (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onExportarHistorico) onExportarHistorico();
-                  }}
-                  className={cn(
-                    "flex items-center rounded-xl transition-all duration-200 cursor-pointer text-xs font-medium",
-                    isExpanded
-                      ? "w-full gap-3 px-3 py-2.5 text-left text-slate-400 hover:text-white hover:bg-slate-800/70"
-                      : "size-11 mx-auto justify-center text-slate-400 hover:text-white hover:bg-slate-800/70",
-                  )}
-                >
-                  <History className="size-5 shrink-0 text-slate-400" />
-                  {isExpanded && (
-                    <span className="truncate flex-1">Histórico de alterações</span>
-                  )}
-                </button>
-              );
+                  if (!isExpanded) {
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>{historyButton}</TooltipTrigger>
+                        <TooltipContent side="right" className="bg-slate-900 text-white text-xs border-slate-700">
+                          Histórico de alterações
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
 
-              if (!isExpanded) {
-                return (
-                  <Tooltip>
-                    <TooltipTrigger asChild>{historyButton}</TooltipTrigger>
-                    <TooltipContent side="right" className="bg-slate-900 text-white text-xs border-slate-700">
-                      Histórico de alterações (.csv)
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              }
-
-              return historyButton;
-            })()}
+                  return historyButton;
+                })()}
+              </>
+            )}
           </div>
         </div>
 
