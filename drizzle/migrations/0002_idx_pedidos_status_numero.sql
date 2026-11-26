@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_pedidos_status_numero ON public.pedidos USING btree (status_coleta, numero_pedido ASC);

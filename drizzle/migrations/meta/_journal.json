@@ -15,6 +15,13 @@
       "when": 1795184867055,
       "tag": "0001_remove_unrestricted_orders_update",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795695357638,
+      "tag": "0002_idx_pedidos_status_numero",
+      "breakpoints": true
     }
   ]
 }
