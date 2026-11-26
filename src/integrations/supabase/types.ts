@@ -169,6 +169,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      criar_backup_importacao: {
+        Args: { p_criado_por: string; p_nome_arquivo: string }
+        Returns: string
+      }
       email_existe: { Args: { _email: string }; Returns: boolean }
       has_role: {
         Args: {
