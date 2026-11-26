@@ -36,6 +36,13 @@
       "when": 1795696735738,
       "tag": "0004_backup_importacao_json_rapido",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795696937445,
+      "tag": "0005_restrict_importacoes_backup",
+      "breakpoints": true
     }
   ]
 }
