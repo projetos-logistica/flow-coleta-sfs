@@ -192,17 +192,19 @@ export async function importarPlanilha(
   onProgresso?.({ enviados: 0, total: upserts.length, etapa: "Gerando backup de segurança" });
   const snapshotPedidos: Record<string, unknown>[] = [];
   const PAGE_BACKUP = 1000;
-  for (let from = 0; from < 100000; from += PAGE_BACKUP) {
-    const { data, error } = await supabase
-      .from("pedidos")
-      .select("*")
-      .range(from, from + PAGE_BACKUP - 1);
+  // Paginação por cursor (numero_pedido) evita OFFSET, que relê todas as páginas anteriores.
+  let cursorBackup: string | null = null;
+  for (let pagina = 0; pagina < 100; pagina++) {
+    let consulta = supabase.from("pedidos").select("*").order("numero_pedido").limit(PAGE_BACKUP);
+    if (cursorBackup !== null) consulta = consulta.gt("numero_pedido", cursorBackup);
+    const { data, error } = await consulta;
     if (error) {
       throw new Error(`Falha ao gerar backup antes da importação: ${error.message}`);
     }
     const lote = (data ?? []) as Record<string, unknown>[];
     snapshotPedidos.push(...lote);
     if (lote.length < PAGE_BACKUP) break;
+    cursorBackup = String(lote[lote.length - 1]?.["numero_pedido"] ?? "");
   }
 
   const { error: backupInsertError } = await supabase.from("importacoes_backup").insert({
@@ -361,15 +363,16 @@ export async function restaurarBackupImportacao(
   // 1. Buscar todos os numero_pedido atuais na tabela pedidos
   const idsAtuais: string[] = [];
   const PAGE = 1000;
-  for (let from = 0; from < 100000; from += PAGE) {
-    const { data, error } = await supabase
-      .from("pedidos")
-      .select("numero_pedido")
-      .range(from, from + PAGE - 1);
+  let cursor: string | null = null;
+  for (let pagina = 0; pagina < 100; pagina++) {
+    let consulta = supabase.from("pedidos").select("numero_pedido").order("numero_pedido").limit(PAGE);
+    if (cursor !== null) consulta = consulta.gt("numero_pedido", cursor);
+    const { data, error } = await consulta;
     if (error) throw new Error(`Erro ao listar pedidos atuais: ${error.message}`);
     const lote = (data ?? []) as { numero_pedido: string }[];
     idsAtuais.push(...lote.map((p) => p.numero_pedido));
     if (lote.length < PAGE) break;
+    cursor = lote[lote.length - 1]?.numero_pedido ?? null;
   }
 
   // Excluir pedidos que não existiam no snapshot
