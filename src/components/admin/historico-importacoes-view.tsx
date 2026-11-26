@@ -112,7 +112,7 @@ export function HistoricoImportacoesView({
     try {
       const { data: snapRow, error: snapErr } = await supabase
         .from("importacoes_backup")
-        .select("dados_snapshot")
+        .select("dados_snapshot, dados_snapshot_json")
         .eq("id", backupSelecionado.id)
         .single();
 
@@ -123,7 +123,7 @@ export function HistoricoImportacoesView({
       await restaurarBackupImportacao(
         backupSelecionado.id,
         backupSelecionado.created_at,
-        (snapRow.dados_snapshot as unknown as Record<string, unknown>[]) ?? [],
+        ((snapRow.dados_snapshot_json ?? snapRow.dados_snapshot) as unknown as Record<string, unknown>[]) ?? [],
       );
       await queryClient.invalidateQueries();
       await carregarBackups();

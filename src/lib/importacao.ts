@@ -190,44 +190,13 @@ export async function importarPlanilha(
 
   // ─── Etapa 1.5: Snapshot automático de backup antes de gravar alterações ───
   onProgresso?.({ enviados: 0, total: upserts.length, etapa: "Gerando backup de segurança" });
-  const snapshotPedidos: Record<string, unknown>[] = [];
-  const PAGE_BACKUP = 1000;
-  // Paginação por cursor (numero_pedido) evita OFFSET, que relê todas as páginas anteriores.
-  let cursorBackup: string | null = null;
-  for (let pagina = 0; pagina < 100; pagina++) {
-    let consulta = supabase.from("pedidos").select("*").order("numero_pedido").limit(PAGE_BACKUP);
-    if (cursorBackup !== null) consulta = consulta.gt("numero_pedido", cursorBackup);
-    const { data, error } = await consulta;
-    if (error) {
-      throw new Error(`Falha ao gerar backup antes da importação: ${error.message}`);
-    }
-    const lote = (data ?? []) as Record<string, unknown>[];
-    snapshotPedidos.push(...lote);
-    if (lote.length < PAGE_BACKUP) break;
-    cursorBackup = String(lote[lote.length - 1]?.["numero_pedido"] ?? "");
-  }
-
-  const { error: backupInsertError } = await supabase.from("importacoes_backup").insert({
-    criado_por: usuario || "Sistema",
-    nome_arquivo: file.name,
-    total_pedidos: snapshotPedidos.length,
-    dados_snapshot: snapshotPedidos as unknown as Json,
+  // Backup gerado dentro do banco: evita baixar e reenviar todos os pedidos pela rede.
+  const { error: backupError } = await supabase.rpc("criar_backup_importacao", {
+    p_criado_por: usuario || "Sistema",
+    p_nome_arquivo: file.name,
   });
-  if (backupInsertError) {
-    throw new Error(`Falha ao salvar backup da importação: ${backupInsertError.message}`);
-  }
-
-  // Mantém apenas as 2 cópias mais recentes em importacoes_backup
-  const { data: backupsExistentes } = await supabase
-    .from("importacoes_backup")
-    .select("id")
-    .order("created_at", { ascending: false });
-
-  if (backupsExistentes && backupsExistentes.length > 2) {
-    const idsParaExcluir = backupsExistentes.slice(2).map((b) => b.id);
-    if (idsParaExcluir.length > 0) {
-      await supabase.from("importacoes_backup").delete().in("id", idsParaExcluir);
-    }
+  if (backupError) {
+    throw new Error(`Falha ao salvar backup da importação: ${backupError.message}`);
   }
 
   // ─── Etapa 2: Upsert dos pedidos presentes na planilha ───

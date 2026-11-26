@@ -22,6 +22,20 @@
       "when": 1795695357638,
       "tag": "0002_idx_pedidos_status_numero",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795696661282,
+      "tag": "0003_criar_backup_importacao",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795696735738,
+      "tag": "0004_backup_importacao_json_rapido",
+      "breakpoints": true
     }
   ]
 }

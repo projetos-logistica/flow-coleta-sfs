@@ -49,6 +49,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           dados_snapshot: Json
+          dados_snapshot_json: Json | null
           id: string
           nome_arquivo: string | null
           total_pedidos: number | null
@@ -56,7 +57,8 @@ export type Database = {
         Insert: {
           created_at?: string
           criado_por?: string | null
-          dados_snapshot: Json
+          dados_snapshot?: Json
+          dados_snapshot_json?: Json | null
           id?: string
           nome_arquivo?: string | null
           total_pedidos?: number | null
@@ -65,6 +67,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           dados_snapshot?: Json
+          dados_snapshot_json?: Json | null
           id?: string
           nome_arquivo?: string | null
           total_pedidos?: number | null
@@ -169,6 +172,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      criar_backup_importacao: {
+        Args: { p_criado_por: string; p_nome_arquivo: string }
+        Returns: string
+      }
       email_existe: { Args: { _email: string }; Returns: boolean }
       has_role: {
         Args: {
