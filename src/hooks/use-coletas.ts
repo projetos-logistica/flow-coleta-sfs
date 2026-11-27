@@ -264,7 +264,7 @@ export function usePedidos(usuario: string) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const off = ouvirAlteracoes(() => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }), 1500);
+      timer = setTimeout(() => queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY }), 60000);
     });
     return () => {
       if (timer) clearTimeout(timer);
@@ -284,6 +284,16 @@ export function usePedidos(usuario: string) {
       })
       .catch(() => undefined);
   }, [query.data, usuario, queryClient]);
+
+  // Atualiza na memória só os pedidos salvos, sem baixar a base inteira de novo.
+  function atualizarCacheLocal(numeros: string[], patch: Partial<Pedido>, remover: boolean) {
+    const salvos = new Set(numeros);
+    queryClient.setQueryData<Pedido[]>(PEDIDOS_KEY, (atual) => {
+      if (!atual) return atual;
+      if (remover) return atual.filter((p) => !salvos.has(p.numero_pedido));
+      return atual.map((p) => (salvos.has(p.numero_pedido) ? { ...p, ...patch } : p));
+    });
+  }
 
   const aplicarStatus = useMutation({
     mutationFn: async ({
@@ -389,10 +399,23 @@ export function usePedidos(usuario: string) {
         falhas,
       };
     },
-    onSuccess: (resultado) => {
+    onSuccess: (resultado, { field, value }) => {
       if (resultado.sucessos.length > 0) {
         avisarAlteracao();
-        return queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
+        const agora = new Date().toISOString();
+        const patch: Partial<Pedido> = { [field]: value, editado_por: usuario };
+        if (field === "status_coleta") {
+          patch.coletado_at = value === "Coletado" ? agora : null;
+          patch.data_coleta = value === "Coletado" ? agora : null;
+        }
+        if (field === "situacao") {
+          patch.situacao_updated_at = agora;
+          patch.data_alteracao_situacao = agora;
+        }
+        atualizarCacheLocal(resultado.sucessos, patch, field === "status_coleta" && value !== "Pendente");
+        if (field === "status_coleta") {
+          void queryClient.invalidateQueries({ queryKey: ["pedidos-coletados-count"] });
+        }
       }
       return undefined;
     },
@@ -516,10 +539,17 @@ export function usePedidos(usuario: string) {
         falhas,
       };
     },
-    onSuccess: (resultado) => {
+    onSuccess: (resultado, { contato, situacao }) => {
       if (resultado.sucessos.length > 0) {
         avisarAlteracao();
-        return queryClient.invalidateQueries({ queryKey: PEDIDOS_KEY });
+        const agora = new Date().toISOString();
+        atualizarCacheLocal(resultado.sucessos, {
+          status_contato: contato,
+          situacao,
+          editado_por: usuario,
+          situacao_updated_at: agora,
+          data_alteracao_situacao: agora,
+        }, false);
       }
       return undefined;
     },
