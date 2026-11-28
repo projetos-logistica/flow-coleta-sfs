@@ -43,6 +43,13 @@
       "when": 1795696937445,
       "tag": "0005_restrict_importacoes_backup",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795865051944,
+      "tag": "0006_agendar_limpeza_coletados",
+      "breakpoints": true
     }
   ]
 }
